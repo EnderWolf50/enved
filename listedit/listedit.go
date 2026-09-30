@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -439,11 +440,16 @@ func pick[T any](cond bool, a, b T) T {
 	return b
 }
 
+var windowsAbs = regexp.MustCompile(`^([A-Za-z]:[\\/]|\\\\)`)
+
 // normalize tidies a typed entry: a file or folder becomes absolute, unless it leans on
 // %VARS% (kept as typed, so they expand wherever the list is read).
 func (k Kind) normalize(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" || !k.onDisk() || strings.Contains(v, "%") {
+		return v
+	}
+	if windowsAbs.MatchString(v) && !filepath.IsAbs(v) { // off Windows: nothing to resolve
 		return v
 	}
 	if abs, err := filepath.Abs(v); err == nil {
