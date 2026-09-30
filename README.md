@@ -4,7 +4,7 @@ View and edit Windows environment variables, User and Machine, from a TUI or the
 line. A sibling of [bump](https://github.com/EnderWolf50/bump) and
 [pathed](https://github.com/EnderWolf50/pathed).
 
-Not written yet: [docs/design.md](docs/design.md) has the plan and the choices still open.
+Not written yet: [docs/design.md](docs/design.md) has the plan.
 
 ## License
 
