@@ -1,8 +1,8 @@
 # enved: design
 
-Status: designed, not written. The first half records what was asked for; the second half
-settles the questions the first draft left open and lays out the packages, screens, CLI and
-the order to build them in.
+Status: written as designed, steps 1 to 5 below; pathed runs on the shared packages. The
+first half records what was asked for; the second half the decisions, the packages, the
+screens and the CLI. Where the code went another way than first planned, the text says so.
 
 ## What it is for
 
@@ -69,9 +69,12 @@ A variable is edited as a list when either holds:
    | files or folders | `CLASSPATH` | the file or folder exists |
    | extensions | `PATHEXT` | starts with `.`, no spaces; duplicates |
 
-2. the user said so: `L` on a variable switches it between list and text, and the choice is
-   kept in the settings (`lists = ["MY_DIRS"]`, `not_lists = ["LIB"]`). A variable added
-   this way is of the kind "text": duplicates are marked, nothing else is checked.
+2. the user said so: in the settings (`lists = ["MY_DIRS"]`, `not_lists = ["LIB"]`), or
+   with `L` on a variable, which switches it between list and text. `L`'s choices are kept
+   in `%LOCALAPPDATA%\enved\lists.toml`, not in the settings file: chezmoi writes that one,
+   and a program rewriting it would fight chezmoi. A variable made a list this way is of
+   the kind "text" (unless the table knows it): duplicates are marked, nothing else is
+   checked.
 
 A value that merely contains `;` is not a list on its own: plenty of values (connection
 strings, `JAVA_TOOL_OPTIONS`) hold semicolons that are not separators.
@@ -81,11 +84,14 @@ strings, `JAVA_TOOL_OPTIONS`) hold semicolons that are not separators.
 The sidebar holds **User**, **Machine** and **Process** (the environment enved started
 with). Process cannot be edited; it is there to answer "why doesn't my shell see it": a
 Process value that differs from what User and Machine would give now is marked `stale`, and
-the details panel says to open a new window, or to use the shell wrapper (below).
+the details panel says to open a new window, or to use the shell wrapper (below). A
+variable no saved one explains (set by Windows at logon, or by the shell) is marked
+`here only`. `Path` is stale only when a saved entry is missing from it: shells add their
+own entries.
 
 ### Guard rails: warn, and confirm twice
 
-Variables Windows or common tools rely on are marked with a lock in the table:
+Variables Windows or common tools rely on are marked `sys` in the table:
 `SystemRoot`, `windir`, `ComSpec`, `OS`, `PATHEXT`, `Path`, `PSModulePath`, `TEMP`, `TMP`,
 `PROCESSOR_*`, `NUMBER_OF_PROCESSORS`, `DriverData`. Changing one is allowed (people fix a
 broken `TEMP`), but removing it or making it empty puts it under a red "system variables"
@@ -103,7 +109,7 @@ it.
 │   Machine       uac  ││ GOPATH               %USERPROFILE%\go                 %       │
 │   Process        ro  ││ JAVA_HOME            C:\Program Files\Java\jdk-25             │
 │                      ││ Path                 C:\Users\me\bin; … (14)          %  list │
-│                      ││ TEMP  🔒             %USERPROFILE%\AppData\Local\Temp %       │
+│                      ││ TEMP                 %USERPROFILE%\AppData\Local\Temp %   sys │
 │                      │├────────────────────────────────────────────────────────────────┤
 │                      ││ JAVA_HOME = C:\Program Files\Java\jdk-25                       │
 │                      ││ REG_SZ · used by: Path (entry 3)                               │
@@ -158,9 +164,10 @@ All under `github.com/EnderWolf50/enved`, taken from pathed's `package main` and
 from "the `Path` value" to "any value":
 
 - **`winenv`** — the registry.
-  - `Scope{Name, Root, Key}`; `User`, `Machine`.
+  - `Scope` (a string: `User`, `Machine`); where each lives in the registry is private.
   - `Value{Data string, Type uint32}`.
-  - `ReadAll(Scope) (map[string]Value, error)`, `Read(Scope, name) (Value, bool, error)`.
+  - `ReadAll(Scope) ([]Var, error)` sorted by name, `Read(Scope, name) (Value, bool, error)`.
+  - `Store{ReadAll, Apply, CanWrite}`: the registry, or a fake in tests.
   - `Change{Scope, Name, Old, New *Value}` (nil `Old` adds, nil `New` removes).
   - `Apply([]Change) error`: backs up, writes, broadcasts once. Before writing it rereads
     each value and refuses a change whose `Old` no longer matches, so a value changed by
@@ -179,16 +186,20 @@ from "the `Path` value" to "any value":
     elevated runs; one change that does not fit on its own is refused before any prompt.
 - **`listedit`** — the list editor: pathed's `entry` (added, edited, removed), the table,
   the add/edit dialog, `K`/`J`, `c` clean, `o` open folder, and the health checks, as a
-  Bubble Tea component. `New(values []string, kind Kind)`, `Update`, `View`, `Result()
-  []string`, `Dirty()`. The kinds above decide the checks and whether `o` applies.
+  Bubble Tea component. `New(title, kind, saved, current, exists)`, `Update` (answering
+  with an `Event`), `Heading`, `Body`, `Overlay`, `Result() []string`, `Dirty()`, `Review()`.
+  A value changed as text and then opened as a list is lined up with the saved one, so its
+  entries still show as added, removed or kept. The kinds above decide the checks and whether `o` applies.
 - **`frame`** — what both programs draw around their content: the sidebar with its `*`,
-  `uac`, `!`, `ro` marks, the panel, the review screen, the quit dialog, the save running
-  off the UI loop. A tab supplies its title, its content component and its changes as
-  `[]winenv.Change`.
-- **`theme`** — the settings file: `sidebar_width`, `[theme]`, and in enved `lists` and
-  `not_lists`. Same keys in both programs; each reads its own file
-  (`~/.config/enved/config.toml`, `$ENVED_CONFIG`), and the dotfiles render both from
-  `themes.toml`, with a `roles.enved` next to `roles.pathed`.
+  `uac`, `!`, `ro` marks, the panel, the review screen (with the second question for
+  warnings), the quit dialog, the save running off the UI loop. A `Tab` supplies its name,
+  heading, body, overlay, its changes as `[]winenv.Change`, their review lines and
+  warnings; a key in it answers with an `Event` (`Back`, `Save`, `Reload`).
+- **`theme`** — the settings file's `[theme]` (`theme.Default`, `Parse`, `Load`, `Path`),
+  the styles made from it, and the helpers that paint table rows. Each program keeps its
+  own settings struct around it: `sidebar_width` in both, `lists` and `not_lists` in enved.
+  Each reads its own file (`~/.config/enved/config.toml`, `$ENVED_CONFIG`), and the
+  dotfiles render both from `themes.toml`, with a `roles.enved` next to `roles.pathed`.
 
 Tests keep pathed's style: a fake store in memory (`winenv` behind an interface in `frame`),
 key presses driven through `Update`, the rendered screen checked with ANSI stripped. CI runs
