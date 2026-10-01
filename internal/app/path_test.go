@@ -25,25 +25,25 @@ func TestPathCLI(t *testing.T) {
 	os.Mkdir(b, 0o755)
 	st, saved := fakeStore(map[string]string{"Path": a}, nil)
 	path := func() []string { return winenv.Split(saved[winenv.User]["Path"].Data) }
-	if err := run([]string{"path", "add", b, "--front"}, st); err != nil {
+	if err := runAs("enved", []string{"path", "add", b, "--front"}, st); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(path(), []string{b, a}) {
 		t.Fatalf("add --front: %q", path())
 	}
-	if err := run([]string{"path", "add", b}, st); err == nil {
+	if err := runAs("enved", []string{"path", "add", b}, st); err == nil {
 		t.Fatal("adding a folder twice did not fail")
 	}
-	if err := run([]string{"path", "rm", "1"}, st); err != nil || !slices.Equal(path(), []string{a}) {
+	if err := runAs("enved", []string{"path", "rm", "1"}, st); err != nil || !slices.Equal(path(), []string{a}) {
 		t.Fatalf("rm 1: %v, %q", err, path())
 	}
-	if err := run([]string{"path", "add", filepath.Join(dir, "nope")}, st); err == nil {
+	if err := runAs("enved", []string{"path", "add", filepath.Join(dir, "nope")}, st); err == nil {
 		t.Fatal("adding a missing folder did not fail")
 	}
-	if err := run([]string{"path", "add", b, "-m"}, st); err == nil {
+	if err := runAs("enved", []string{"path", "add", b, "-m"}, st); err == nil {
 		t.Fatal("a declined UAC prompt did not fail path add -m")
 	}
-	if err := run([]string{"path", "nope"}, st); err == nil || !strings.Contains(err.Error(), "pathed list") {
+	if err := runAs("enved", []string{"path", "nope"}, st); err == nil || !strings.Contains(err.Error(), "pathed list") {
 		t.Fatalf("an unknown path command: %v", err)
 	}
 	// pathed is enved path.

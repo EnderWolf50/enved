@@ -86,8 +86,6 @@ var (
 type Model struct {
 	Title    string // the heading: "User PATH", "User › PSModulePath"
 	ReadOnly bool   // a list that cannot be changed, only looked at
-	// ExtraKeys are the holder's own keys that work in the editor, for its help line.
-	ExtraKeys []key.Binding
 
 	kind    Kind
 	exists  func(string) bool
@@ -188,7 +186,6 @@ func (m *Model) Reset(saved, current []string) {
 }
 
 // Kind is what the entries are.
-func (m *Model) Kind() Kind { return m.kind }
 
 // Result is the list as saving would write it.
 func (m *Model) Result() []string {
@@ -246,17 +243,18 @@ func (m *Model) Reordered() bool {
 // entry (dupOf is that entry's position, from 1). Removed entries are left out of both.
 func (m *Model) health() (problem []string, dupOf []int) {
 	problem, dupOf = make([]string, len(m.entries)), make([]int, len(m.entries))
-	first := map[string]int{}
+	var live []int // positions of the entries kept
+	var values []string
 	for i, e := range m.entries {
-		if e.removed {
-			continue
+		if !e.removed {
+			live, values = append(live, i), append(values, e.value)
 		}
-		problem[i] = m.kind.problem(e.value, m.exists)
-		k := m.kind.key(e.value)
-		if j, seen := first[k]; seen {
-			dupOf[i] = j + 1
-		} else {
-			first[k] = i
+	}
+	p, d := m.kind.Health(values, m.exists)
+	for n, i := range live {
+		problem[i] = p[n]
+		if d[n] > 0 {
+			dupOf[i] = live[d[n]-1] + 1
 		}
 	}
 	return problem, dupOf
@@ -624,7 +622,7 @@ func (m *Model) footer() string {
 	if m.kind.onDisk() {
 		edit = append(edit, keyOpen)
 	}
-	groups := [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}, edit, m.ExtraKeys, {keyUndo, keyRedo, keySave, keyReload}}
+	groups := [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}, edit, {keyUndo, keyRedo, keySave, keyReload}}
 	if m.ReadOnly {
 		groups = [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}}
 	}

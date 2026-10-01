@@ -37,28 +37,23 @@ For the other environment variables, see enved.`
 var isFolder = listedit.Exists(listedit.Folders)
 
 // pathKey is what two entries are compared by: expanded, case-insensitive, no trailing slash.
-func pathKey(e string) string {
-	return strings.ToLower(strings.TrimRight(winenv.Expand(e), `\/`))
-}
+var pathKey = listedit.Folders.Key
 
-// pathStatus reports, per entry, whether it repeats an earlier one and whether its folder
-// exists.
-func pathStatus(entries []string, exists func(string) bool) (dup, missing []bool) {
-	seen := map[string]bool{}
-	dup, missing = make([]bool, len(entries)), make([]bool, len(entries))
-	for i, e := range entries {
-		k := pathKey(e)
-		dup[i], missing[i] = seen[k], !exists(e)
-		seen[k] = true
+// readPath is a scope's PATH and its entries; v is nil when it has none yet.
+func readPath(st winenv.Store, s winenv.Scope) (v *winenv.Var, entries []string, err error) {
+	old, ok, err := find(st, s, "Path")
+	if !ok {
+		return nil, nil, err
 	}
-	return dup, missing
+	return &old, winenv.Split(old.Data), err
 }
 
+// cleanPath is entries without the missing folders and the repeats.
 func cleanPath(entries []string, exists func(string) bool) []string {
-	dup, missing := pathStatus(entries, exists)
+	problem, dupOf := listedit.Folders.Health(entries, exists)
 	var out []string
 	for i, e := range entries {
-		if !dup[i] && !missing[i] {
+		if problem[i] == "" && dupOf[i] == 0 {
 			out = append(out, e)
 		}
 	}
@@ -79,14 +74,9 @@ func pathChange(s winenv.Scope, old *winenv.Var, entries []string) winenv.Change
 }
 
 func runPath(st winenv.Store, f flags, rest []string) error {
-	old, ok, err := find(st, f.scope, "Path")
+	v, entries, err := readPath(st, f.scope)
 	if err != nil {
 		return err
-	}
-	var v *winenv.Var
-	var entries []string
-	if ok {
-		v, entries = &old, winenv.Split(old.Data)
 	}
 	if len(rest) == 0 {
 		if err := loadConfig(); err != nil {
@@ -104,13 +94,13 @@ func runPath(st winenv.Store, f flags, rest []string) error {
 	}
 	switch cmd := rest[0]; {
 	case cmd == "list" || cmd == "ls":
-		dup, missing := pathStatus(entries, isFolder)
+		problem, dupOf := listedit.Folders.Health(entries, isFolder)
 		for i, e := range entries {
 			note := ""
-			if missing[i] {
-				note += "  [missing]"
+			if problem[i] != "" {
+				note += "  [" + problem[i] + "]"
 			}
-			if dup[i] {
+			if dupOf[i] > 0 {
 				note += "  [duplicate]"
 			}
 			fmt.Printf("%3d  %s%s\n", i+1, e, note)

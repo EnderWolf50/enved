@@ -9,9 +9,6 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// Registry is the store the programs use; elevate.Registry adds writing through UAC.
-var Registry = Store{ReadAll: ReadAll, Apply: Apply, CanWrite: CanWrite}
-
 func location(s Scope) (registry.Key, string) {
 	if s == Machine {
 		return registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`
@@ -41,17 +38,6 @@ func ReadAll(s Scope) ([]Var, error) {
 	}
 	Sort(vars)
 	return vars, nil
-}
-
-// Read is one variable; ok is false when it is not set.
-func Read(s Scope, name string) (v Value, ok bool, err error) {
-	root, path := location(s)
-	k, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
-	if err != nil {
-		return Value{}, false, err
-	}
-	defer k.Close()
-	return get(k, name)
 }
 
 func get(k registry.Key, name string) (Value, bool, error) {

@@ -12,13 +12,10 @@ import (
 // writing fails.
 var errNoRegistry = errors.New("the persistent environment is a Windows setting")
 
-var Registry = Store{ReadAll: ReadAll, Apply: Apply, CanWrite: CanWrite}
-
-func ReadAll(Scope) ([]Var, error)                     { return nil, errNoRegistry }
-func Read(Scope, string) (v Value, ok bool, err error) { return Value{}, false, errNoRegistry }
-func Apply([]Change) error                             { return errNoRegistry }
-func CanWrite(Scope) bool                              { return false }
-func Broadcast()                                       {}
+func ReadAll(Scope) ([]Var, error) { return nil, errNoRegistry }
+func Apply([]Change) error         { return errNoRegistry }
+func CanWrite(Scope) bool          { return false }
+func Broadcast()                   {}
 
 // Expand expands %VARS% with this process's environment, names compared case-insensitively
 // as on Windows.

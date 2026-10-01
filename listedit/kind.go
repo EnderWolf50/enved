@@ -46,12 +46,28 @@ func (k Kind) placeholder() string {
 // onDisk says whether entries name files or folders (they expand, exist, can be opened).
 func (k Kind) onDisk() bool { return k == Folders || k == Paths }
 
-// key is what two entries are compared by to find repeats.
-func (k Kind) key(e string) string {
+// Key is what two entries are compared by to find repeats.
+func (k Kind) Key(e string) string {
 	if k.onDisk() {
 		return strings.ToLower(strings.TrimRight(winenv.Expand(e), `\/`))
 	}
 	return strings.ToLower(strings.TrimSpace(e))
+}
+
+// Health is what is wrong with each entry: a problem of its own ("missing", "not .ext"), or
+// it repeats an earlier entry (dupOf is that entry's position, from 1).
+func (k Kind) Health(entries []string, exists func(string) bool) (problem []string, dupOf []int) {
+	problem, dupOf = make([]string, len(entries)), make([]int, len(entries))
+	first := map[string]int{}
+	for i, e := range entries {
+		problem[i] = k.problem(e, exists)
+		if j, seen := first[k.Key(e)]; seen {
+			dupOf[i] = j + 1
+		} else {
+			first[k.Key(e)] = i
+		}
+	}
+	return problem, dupOf
 }
 
 // problem is what is wrong with an entry on its own, or "".

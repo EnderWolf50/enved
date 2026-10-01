@@ -83,8 +83,6 @@ type flags struct {
 	front                          bool // path add: at the front
 }
 
-func run(args []string, st winenv.Store) error { return runAs("enved", args, st) }
-
 func runAs(prog string, args []string, st winenv.Store) error {
 	f := flags{scope: winenv.User}
 	var rest []string

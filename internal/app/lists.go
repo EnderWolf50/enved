@@ -19,8 +19,8 @@ import (
 )
 
 type listPrefs struct {
-	lists, notLists map[string]bool // by winenv.Key
-	path            string          // where L's choices are kept; "" keeps them for this run
+	isList map[string]bool // by winenv.Key; absent: listedit decides by name
+	path   string          // where L's choices are kept; "" keeps them for this run
 }
 
 type listsFile struct {
@@ -30,7 +30,7 @@ type listsFile struct {
 
 // loadLists starts from the settings' lists, then L's earlier choices.
 func loadLists(c config, path string) (*listPrefs, error) {
-	p := &listPrefs{lists: map[string]bool{}, notLists: map[string]bool{}, path: path}
+	p := &listPrefs{isList: map[string]bool{}, path: path}
 	p.add(listsFile{c.Lists, c.NotLists})
 	if path == "" {
 		return p, nil
@@ -49,21 +49,18 @@ func loadLists(c config, path string) (*listPrefs, error) {
 
 func (p *listPrefs) add(f listsFile) {
 	for _, n := range f.Lists {
-		p.lists[winenv.Key(n)], p.notLists[winenv.Key(n)] = true, false
+		p.isList[winenv.Key(n)] = true
 	}
 	for _, n := range f.NotLists {
-		p.lists[winenv.Key(n)], p.notLists[winenv.Key(n)] = false, true
+		p.isList[winenv.Key(n)] = false
 	}
 }
 
 // kind says whether a variable is edited as a list, and what its entries are.
 func (p *listPrefs) kind(name string) (listedit.Kind, bool) {
 	k, known := listedit.Known(name)
-	switch {
-	case p.notLists[winenv.Key(name)]:
-		return 0, false
-	case p.lists[winenv.Key(name)]:
-		return k, true
+	if on, set := p.isList[winenv.Key(name)]; set {
+		return k, on
 	}
 	return k, known
 }
@@ -71,19 +68,15 @@ func (p *listPrefs) kind(name string) (listedit.Kind, bool) {
 // toggle marks a variable a list or text, the other way round, and keeps the choice.
 func (p *listPrefs) toggle(name string) error {
 	_, isList := p.kind(name)
-	k := winenv.Key(name)
-	p.lists[k], p.notLists[k] = !isList, isList
+	p.isList[winenv.Key(name)] = !isList
 	if p.path == "" {
 		return nil
 	}
 	var f listsFile
-	for n, on := range p.lists {
+	for n, on := range p.isList {
 		if on {
 			f.Lists = append(f.Lists, n)
-		}
-	}
-	for n, on := range p.notLists {
-		if on {
+		} else {
 			f.NotLists = append(f.NotLists, n)
 		}
 	}
@@ -103,16 +96,4 @@ func (p *listPrefs) toggle(name string) error {
 // listsPath is where L's choices are kept.
 func listsPath() string {
 	return filepath.Join(winenv.BackupDir(), "lists.toml")
-}
-
-// listNames are the variables made lists by the settings or L, for tests and messages.
-func (p *listPrefs) listNames() []string {
-	var out []string
-	for n, on := range p.lists {
-		if on {
-			out = append(out, n)
-		}
-	}
-	slices.Sort(out)
-	return out
 }

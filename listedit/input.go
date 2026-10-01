@@ -58,7 +58,7 @@ func (m *Model) Overlay() string {
 			check = theme.Err.Render(m.kind.explain(p) + " (it can still be added)")
 		}
 		for i, e := range m.entries {
-			if !e.removed && (b.adding || i != b.at) && m.kind.key(e.value) == m.kind.key(v) {
+			if !e.removed && (b.adding || i != b.at) && m.kind.Key(e.value) == m.kind.Key(v) {
 				check = theme.Warn.Render(fmt.Sprintf("already listed as #%d", i+1))
 				break
 			}

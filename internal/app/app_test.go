@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -498,34 +497,34 @@ func TestEditOpensOnTheVariable(t *testing.T) {
 
 func TestCLI(t *testing.T) {
 	st, saved := fakeStore(map[string]string{"A": "1", "Path": `C:\x`, "E": "%A%"}, nil)
-	if err := run([]string{"set", "a", "2"}, st); err != nil {
+	if err := runAs("enved", []string{"set", "a", "2"}, st); err != nil {
 		t.Fatal(err)
 	}
 	if saved[winenv.User]["A"].Data != "2" {
 		t.Fatalf("set: %v", saved[winenv.User])
 	}
-	if err := run([]string{"set", "--no-expand", "NEW", "--", "-50%"}, st); err != nil {
+	if err := runAs("enved", []string{"set", "--no-expand", "NEW", "--", "-50%"}, st); err != nil {
 		t.Fatal(err)
 	}
 	if v := saved[winenv.User]["NEW"]; v.Data != "-50%" || v.Type != winenv.SZ {
 		t.Fatalf("set --no-expand: %+v", v)
 	}
-	if err := run([]string{"set", "E", "%B%"}, st); err != nil || !saved[winenv.User]["E"].Expands() {
+	if err := runAs("enved", []string{"set", "E", "%B%"}, st); err != nil || !saved[winenv.User]["E"].Expands() {
 		t.Fatalf("set kept the type? %v %+v", err, saved[winenv.User]["E"])
 	}
-	if err := run([]string{"unset", "Path"}, st); err == nil {
+	if err := runAs("enved", []string{"unset", "Path"}, st); err == nil {
 		t.Fatal("unset of Path without --force did not fail")
 	}
-	if err := run([]string{"unset", "Path", "--force"}, st); err != nil {
+	if err := runAs("enved", []string{"unset", "Path", "--force"}, st); err != nil {
 		t.Fatal(err)
 	}
-	if err := run([]string{"get", "Path"}, st); err == nil {
+	if err := runAs("enved", []string{"get", "Path"}, st); err == nil {
 		t.Fatal("get of a removed variable did not fail")
 	}
-	if err := run([]string{"set", "-m", "M", "1"}, st); err == nil {
+	if err := runAs("enved", []string{"set", "-m", "M", "1"}, st); err == nil {
 		t.Fatal("a declined UAC prompt did not fail set -m")
 	}
-	if err := run([]string{"set", "BAD=NAME", "1"}, st); err == nil {
+	if err := runAs("enved", []string{"set", "BAD=NAME", "1"}, st); err == nil {
 		t.Fatal("a name with = was accepted")
 	}
 }
@@ -602,9 +601,6 @@ func TestConfigListsOverrideGuesses(t *testing.T) {
 	}
 	if kind, isList := p.kind("Path"); !isList || kind == 0 {
 		t.Error("Path is not a list of folders")
-	}
-	if !slices.Contains(p.listNames(), "my_dirs") {
-		t.Error("listNames lacks my_dirs")
 	}
 }
 
