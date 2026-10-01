@@ -108,24 +108,6 @@ func (m Model) tab() Tab { return m.tabs[m.on] }
 // Tab is the tab on the sidebar's selection.
 func (m Model) Tab() Tab { return m.tab() }
 
-// InBody says whether the keys go to the selected tab's body.
-func (m Model) InBody() bool { return m.inBody }
-
-// Reviewing says whether the review (or the outcome of a save) is on screen.
-func (m Model) Reviewing() bool { return m.reviewing }
-
-// Saving says whether a save is running.
-func (m Model) Saving() bool { return m.saving }
-
-// Outcome is what the last save did, while it is on screen.
-func (m Model) Outcome() []string { return m.outcome }
-
-// ConfirmingQuit says whether the quit question is open.
-func (m Model) ConfirmingQuit() bool { return m.confirmQuit }
-
-// SaveErr is why the last save of tab i failed, or nil.
-func (m Model) SaveErr(i int) error { return m.saveErr[i] }
-
 // Status is the note next to the heading, the frame's or the tab's.
 func (m Model) Status() string {
 	if m.status != "" {

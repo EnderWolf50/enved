@@ -140,7 +140,7 @@ func save(t *testing.T, m frame.Model, keys ...string) frame.Model {
 		next, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter, Text: k})
 		m = next.(frame.Model)
 	}
-	if !m.Saving() || cmd == nil {
+	if cmd == nil {
 		t.Fatal("enter on the review did not start saving")
 	}
 	next, _ := m.Update(cmd())
@@ -198,10 +198,10 @@ func TestEditAddRenameRemoveAndSave(t *testing.T) {
 	m = press(m, "d")
 
 	m = press(m, "s")
-	if !m.Reviewing() {
-		t.Fatal("s did not show the review")
-	}
 	review := screen(m)
+	if !strings.Contains(review, "what saving will write") {
+		t.Fatalf("s did not show the review:\n%s", review)
+	}
 	for _, want := range []string{"~ EDITOR", "vi  →  nvim", "+ NEW_ONE", "- GOPATH", "still used by NEW_ONE", "OLD  →  RENAMED"} {
 		if !strings.Contains(review, want) {
 			t.Errorf("the review lacks %q:\n%s", want, review)
@@ -218,8 +218,8 @@ func TestEditAddRenameRemoveAndSave(t *testing.T) {
 	if _, ok := u["GOPATH"]; ok {
 		t.Fatal("GOPATH was not removed")
 	}
-	if vars(m).Dirty() || !strings.Contains(strings.Join(m.Outcome(), "\n"), "User variables saved") {
-		t.Fatalf("after saving: dirty %v, outcome %q", vars(m).Dirty(), m.Outcome())
+	if vars(m).Dirty() || !strings.Contains(screen(m), "User variables saved") {
+		t.Fatalf("after saving: dirty %v, screen:\n%s", vars(m).Dirty(), screen(m))
 	}
 }
 
@@ -273,15 +273,15 @@ func TestMachineDeclinedKeepsChanges(t *testing.T) {
 	if _, ok := saved[winenv.User]["A"]; ok {
 		t.Fatal("User was not saved")
 	}
-	if m.SaveErr(1) == nil || !strings.Contains(strings.Join(m.Outcome(), "\n"), "Machine variables not saved") {
-		t.Fatalf("outcome %q", m.Outcome())
+	if !strings.Contains(screen(m), "Machine variables not saved") {
+		t.Fatalf("outcome:\n%s", screen(m))
 	}
 	m = press(m, "esc", "esc", "j")
 	if !m.Tab().(*varTab).Dirty() {
 		t.Fatal("Machine lost its change")
 	}
 	m = press(m, "q")
-	if !m.ConfirmingQuit() {
+	if !strings.Contains(screen(m), "Quit without saving?") {
 		t.Fatal("quitting with a change did not ask")
 	}
 }
@@ -294,11 +294,11 @@ func TestSystemVariableAsksTwice(t *testing.T) {
 		t.Fatalf("no warning in the review:\n%s", screen(m))
 	}
 	m = press(m, "enter")
-	if m.Saving() || !strings.Contains(screen(m), "Save the changes marked ! as well?") {
+	if !strings.Contains(screen(m), "Save the changes marked ! as well?") {
 		t.Fatal("the first enter did not ask again")
 	}
 	m = press(m, "esc")
-	if !m.Reviewing() {
+	if !strings.Contains(screen(m), "what saving will write") {
 		t.Fatal("esc on the second question left the review")
 	}
 	m = save(t, m, "enter", "y")
@@ -483,7 +483,7 @@ func TestEditOpensOnTheVariable(t *testing.T) {
 		t.Fatal(err)
 	}
 	m = sized(m, 120, 30)
-	if !m.InBody() || vars(m).open == nil || !strings.Contains(screen(m), "User › PATHEXT") {
+	if vars(m).open == nil || !strings.Contains(screen(m), "User › PATHEXT") {
 		t.Fatalf("edit did not open PATHEXT's list:\n%s", screen(m))
 	}
 	m = press(m, "a")
