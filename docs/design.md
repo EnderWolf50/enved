@@ -114,7 +114,7 @@ it.
 │                      ││ JAVA_HOME = C:\Program Files\Java\jdk-25                       │
 │                      ││ REG_SZ · used by: Path (entry 3)                               │
 ╰──────────────────────╯╰────────────────────────────────────────────────────────────────╯
- a add · enter edit · d remove · n rename · x %expand · L list/text · / filter · s save
+ a add · enter edit · d remove · n rename · x %expand · L as list/text · / filter · s save
 ```
 
 - **Table**: name, the value on one line (a list shows its first entry and a count), `%` for
@@ -129,7 +129,10 @@ it.
   screen, heading `User › Path`), and `esc` comes back with its changes marked on the row.
 - **Keys** in the table: `a` add, `enter`/`e` edit, `d` remove or keep again, `n` rename
   (a remove plus an add, shown as one change), `x` switch `REG_SZ`/`REG_EXPAND_SZ`, `L`
-  list or text, `y` copy the value, `u` undo this scope, `/`, `r`, `s` as in pathed.
+  edit in the other form (list or text) at once, and from then on, `y` copy the value, `u`
+  undo this scope, `/`, `r`, `s` as in pathed. In the list editor, `a` and `i` add after and
+  before the cursor, and `L` goes back to editing the value as text; `x` does nothing there,
+  so it never means two things.
 - A value typed with a `%` in it becomes `REG_EXPAND_SZ` unless the user switched it with
   `x`; the review shows every type change.
 - Names are checked as they are typed: not empty, no `=`, not already in this scope

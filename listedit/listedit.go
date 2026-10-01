@@ -61,9 +61,10 @@ var (
 	keyDown   = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
 	keyMoveUp = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
 	keyMoveDn = key.NewBinding(key.WithKeys("J", "shift+down"))
-	keyAdd    = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add"))
+	keyAppend = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
+	keyInsert = key.NewBinding(key.WithKeys("i"))
 	keyEdit   = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
-	keyRemove = key.NewBinding(key.WithKeys("d", "x", "delete"), key.WithHelp("d", "remove"))
+	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
 	keyClean  = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
 	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo all"))
 	keyOpen   = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
@@ -77,6 +78,8 @@ var (
 type Model struct {
 	Title    string // the heading: "User PATH", "User › PSModulePath"
 	ReadOnly bool   // a list that cannot be changed, only looked at
+	// ExtraKeys are the holder's own keys that work in the editor, for its help line.
+	ExtraKeys []key.Binding
 
 	kind    Kind
 	exists  func(string) bool
@@ -375,9 +378,9 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 			open(winenv.Expand(e.value))
 		}
 		return nil, None
-	case key.Matches(msg, keyAdd):
+	case key.Matches(msg, keyAppend, keyInsert):
 		if m.editable() {
-			return m.openInput(i, true), None
+			return m.openAdd(i, key.Matches(msg, keyInsert)), None
 		}
 	case key.Matches(msg, keyEdit):
 		if ok && m.editable() {
@@ -532,7 +535,8 @@ func (m *Model) Body() string {
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
 
-	keys := []key.Binding{keyUp, keyDown, keyEdit, keyAdd, keyRemove, keyMoveUp, keySave, keyBack, keyClean, keyUndo, keyFilter}
+	keys := append([]key.Binding{keyUp, keyDown, keyEdit, keyAppend, keyRemove, keyMoveUp, keySave, keyBack}, m.ExtraKeys...)
+	keys = append(keys, keyClean, keyUndo, keyFilter)
 	if m.kind.onDisk() {
 		keys = append(keys, keyOpen)
 	}

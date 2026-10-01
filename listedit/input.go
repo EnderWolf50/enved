@@ -16,8 +16,14 @@ import (
 // inputBox asks for an entry, over the list, checking it as it is typed.
 type inputBox struct {
 	field  textinput.Model
-	at     int // the entry being edited, or the one a new entry goes after (-1: first)
+	at     int // the entry being edited, or where a new entry goes
 	adding bool
+}
+
+// openAdd asks for a new entry next to the one under the cursor (i, -1 for none): after it
+// (a, append) or before it (i, insert).
+func (m *Model) openAdd(i int, before bool) tea.Cmd {
+	return m.openInput(pick(before, max(i, 0), i+1), true)
 }
 
 func (m *Model) openInput(at int, adding bool) tea.Cmd {
@@ -39,7 +45,7 @@ func (m *Model) Overlay() string {
 	if b == nil {
 		return ""
 	}
-	title := "Add to " + m.Title
+	title := fmt.Sprintf("Add to %s as #%d", m.Title, b.at+1)
 	if !b.adding {
 		title = fmt.Sprintf("Edit #%d of %s", b.at+1, m.Title)
 	}
@@ -83,7 +89,6 @@ func (m *Model) updateInput(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		at := b.at
 		if b.adding {
-			at = b.at + 1
 			m.entries = slices.Insert(m.entries, at, &entry{value: v})
 		} else {
 			m.entries[at].value = v
