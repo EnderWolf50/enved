@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -188,7 +190,7 @@ func TestEditAddRenameRemoveAndSave(t *testing.T) {
 
 	// Rename OLD, remove GOPATH (NEW_ONE still uses it: the review says so).
 	m = cursorOn(t, m, "OLD")
-	m = press(m, "n")
+	m = press(m, "r")
 	m = clear(m, 3)
 	m = typeText(m, "RENAMED")
 	m = press(m, "enter")
@@ -314,30 +316,30 @@ func TestTypeAndListToggles(t *testing.T) {
 	if vars(m).open != nil || vars(m).dialog == nil {
 		t.Fatal("DIRS opened as a list before L said so")
 	}
-	// L opens it as a list right away, and enter does from then on.
+	// L only marks it a list, and keeps that; enter then opens the list editor.
 	m = press(m, "esc", "L")
-	if vars(m).open == nil {
-		t.Fatal("L did not open DIRS as a list")
+	if vars(m).open != nil || vars(m).dialog != nil {
+		t.Fatal("L opened an editor")
 	}
 	prefs := vars(m).prefs
 	again, _ := loadLists(cfg, prefs.path)
 	if _, isList := again.kind("dirs"); !isList {
 		t.Fatal("the choice was not kept")
 	}
-	m = press(m, "a")
+	m = press(m, "enter", "a")
 	m = typeText(m, `C:\c`)
 	m = press(m, "enter", "esc", "enter")
 	if vars(m).open == nil || vars(m).open.list.Pending() != 1 {
 		t.Fatal("enter did not open DIRS as a list again, with its change")
 	}
-	// L in the list editor: back to text, in the dialog, with the entries' changes kept.
-	m = press(m, "L")
+	// e edits a list as one value, with the entries' changes in it, and leaves it a list.
+	m = press(m, "esc", "e")
 	if vars(m).open != nil || vars(m).dialog == nil || vars(m).dialog.value.Value() != `C:\a;C:\c;C:\b` {
-		t.Fatalf("L in the list editor did not switch to text: %+v", vars(m).dialog)
+		t.Fatalf("e did not edit DIRS as text: %+v", vars(m).dialog)
 	}
-	m = press(m, "esc")
+	m = press(m, "esc", "L")
 	if _, isList := prefs.kind("DIRS"); isList {
-		t.Fatal("DIRS is still a list")
+		t.Fatal("DIRS is still a list after a second L")
 	}
 
 	// x switches the type; after it, the % in the value does not switch it back.
@@ -350,6 +352,93 @@ func TestTypeAndListToggles(t *testing.T) {
 	m = save(t, m)
 	if saved[winenv.User]["PCT"].Type != winenv.SZ || saved[winenv.User]["PCT"].Data != "50%" {
 		t.Fatalf("PCT saved as %+v", saved[winenv.User]["PCT"])
+	}
+}
+
+// u takes back one change at a time, the list editor's included; U drops them all, and u
+// brings them back.
+func TestUndoOneStepAtATime(t *testing.T) {
+	st, _ := fakeStore(map[string]string{"A": "1", "B": "2", "Path": `C:\a;C:\b`}, nil)
+	m := testModel(t, st)
+	m = press(m, "enter")
+	m = cursorOn(t, m, "A")
+	m = press(m, "d") // 1: remove A
+	m = cursorOn(t, m, "B")
+	m = press(m, "r") // 2: rename B to C
+	m = clear(m, 1)
+	m = typeText(m, "C")
+	m = press(m, "enter")
+	m = cursorOn(t, m, "Path")
+	m = press(m, "enter", "j", "d", "esc") // 3: remove C:\b from Path
+	vt := vars(m)
+	state := func() string {
+		var out []string
+		for _, v := range vt.vars {
+			out = append(out, v.change().Sign()+v.name+"="+v.current().Data)
+		}
+		return strings.Join(out, " ")
+	}
+	want := []string{
+		`-A=1 ~C=2 ~Path=C:\a`,
+		`-A=1 ~C=2  Path=C:\a;C:\b`,
+		`-A=1  B=2  Path=C:\a;C:\b`,
+		` A=1  B=2  Path=C:\a;C:\b`,
+	}
+	if got := state(); got != want[0] {
+		t.Fatalf("before undo: %s", got)
+	}
+	m = press(m, "U")
+	if got := state(); got != want[3] {
+		t.Fatalf("U: %s", got)
+	}
+	m = press(m, "u")
+	if got := state(); got != want[0] {
+		t.Fatalf("u after U: %s", got)
+	}
+	m = cursorOn(t, m, "Path")
+	m = press(m, "enter", "u") // in the list editor
+	if got := state(); got != want[1] {
+		t.Fatalf("u in the list editor: %s", got)
+	}
+	m = press(m, "esc", "u", "u")
+	if got := state(); got != want[3] {
+		t.Fatalf("u, u: %s", got)
+	}
+	m = press(m, "u")
+	if vt.Status() != "nothing to undo" {
+		t.Fatalf("status %q", vt.Status())
+	}
+}
+
+func TestCopyNameAndValue(t *testing.T) {
+	st, _ := fakeStore(map[string]string{"A": "1"}, nil)
+	m := testModel(t, st)
+	for k, want := range map[string]string{"y": "1", "Y": "A"} {
+		next, cmd := press(m, "enter").Update(tea.KeyPressMsg{Code: rune(k[0]), Text: k})
+		m = next.(frame.Model)
+		if cmd == nil || !strings.Contains(fmt.Sprint(cmd()), want) {
+			t.Errorf("%s copied %v, want %q", k, cmd(), want)
+		}
+		m = press(m, "esc")
+	}
+}
+
+// The sidebar's counts line up whatever else a row shows.
+func TestSidebarCountsAlign(t *testing.T) {
+	st, _ := fakeStore(map[string]string{"A": "1", "B": "2"}, map[string]string{"M": "x", "N": "y", "O": "z"})
+	m := testModel(t, st)
+	m = press(m, "enter", "d", "esc") // User has a change
+	cols := map[string]int{}
+	for _, line := range strings.Split(screen(m), "\n") {
+		for _, name := range []string{"User", "Machine"} {
+			side, _, _ := strings.Cut(line, "││")
+			if strings.Contains(side, " "+name+" ") {
+				cols[name] = utf8.RuneCountInString(side[:strings.LastIndexAny(side, "0123456789")])
+			}
+		}
+	}
+	if cols["User"] == 0 || cols["User"] != cols["Machine"] {
+		t.Fatalf("the counts end at %v:\n%s", cols, screen(m))
 	}
 }
 

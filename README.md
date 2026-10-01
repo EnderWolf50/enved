@@ -40,24 +40,27 @@ elevated, saving asks UAC once, and an elevated copy of enved does the write. `s
 variable's type; a new one is `REG_EXPAND_SZ` when its value holds a `%`. Removing a variable
 Windows relies on (`SystemRoot`, `ComSpec`, `TEMP`, `Path`, ...) needs `--force`.
 
-In the editor the sidebar holds User, Machine and Process (`*` unsaved changes, `uac` saving
-asks for admin, `!` could not be read or saved, `ro` read-only); `enter` opens one. Changes
+In the editor the sidebar holds User, Machine and Process, each with its number of variables
+(`uac` saving asks for admin, `ro` read-only; `*` unsaved changes, `!` could not be read or
+saved); `enter` opens one. Changes
 are only marked until you save: added variables show green, edited ones amber, removed ones
 red and struck through; `s` shows every change, and removing or emptying a system variable
 asks a second time.
 
 | Key | In the variables |
 | --- | --- |
-| `enter`, `e` | edit the value; a list opens in the list editor |
+| `enter` | edit: a list opens in the list editor, anything else in a text field |
+| `e` | edit as text, a list included (its entries joined with `;`) |
 | `a` | add a variable (name, then value); the table stays sorted by name, as Windows keeps no order |
-| `n` | rename |
+| `r` | rename |
 | `d` | remove, or keep again |
 | `x` | switch how it is saved: `REG_SZ` (as it is) or `REG_EXPAND_SZ` (`%VARS%` expanded when read) |
-| `L` | edit it in the other form, list or text, now and from then on |
-| `y` | copy the value |
-| `u` | undo every change to this scope |
+| `L` | mark it a list or text, which `enter` then follows (the `list` in the KIND column); it opens nothing |
+| `y` / `Y` | copy the value / the name |
+| `u` | undo the last change, here or in a list editor; again for the one before |
+| `U` | undo every change to this scope (`u` brings them back) |
 | `/` | filter by name or value |
-| `r` | read the variables again |
+| `R` | read the variables again |
 | `s` | review the changes, then save them |
 | `←` `h` `esc` `q` | back (out of the list editor, then to the sidebar) |
 
@@ -69,7 +72,7 @@ asks a second time.
 | `K` / `J` | move the entry up / down |
 | `c` | mark every missing folder and duplicate for removal |
 | `o` | open the folder in Explorer |
-| `L` | edit the variable as text instead |
+| `u` / `U` | undo the last change / every change to the variable |
 | `←` `h` `esc` `q` | back to the variables, keeping the changes marked |
 
 The details under the table show the expanded value, the registry type, and which variables

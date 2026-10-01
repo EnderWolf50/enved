@@ -187,7 +187,7 @@ func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "s":
 		return m.startReview()
-	case "r":
+	case "R":
 		return m.reload()
 	case "up", "k":
 		m.on = max(m.on-1, 0)
@@ -203,7 +203,7 @@ func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // reload reads the selected tab again, unless it has changes that would be lost.
 func (m Model) reload() (tea.Model, tea.Cmd) {
 	if m.tab().Dirty() {
-		m.status = "unsaved changes: u undoes them first"
+		m.status = "unsaved changes: U undoes them first"
 		return m, nil
 	}
 	m.tab().Load()
@@ -244,22 +244,26 @@ func (m Model) viewMain() string {
 	sideW := m.opts.SidebarWidth
 	var side []string
 	for i, t := range m.tabs {
-		count := t.Count()
+		// Fixed columns, so the counts line up: name, tag (uac, ro), count, flag (! or *).
+		tag, count, flag := "", t.Count(), " "
+		switch {
+		case t.ReadOnly():
+			tag = "ro"
+		case t.NeedsAdmin():
+			tag = "uac"
+		}
 		switch {
 		case t.Err() != nil:
-			count = theme.Err.Render("!")
+			count, flag = "", theme.Err.Render("!")
 		case m.saveErr[i] != nil:
-			count = theme.Err.Render("!") + " " + count
-		case t.ReadOnly():
-			count += " ro"
-		case t.NeedsAdmin():
-			count += " uac"
+			flag = theme.Err.Render("!")
+		case t.Dirty():
+			flag = "*"
 		}
-		if t.Dirty() {
-			count += " *"
-		}
-		// The panel's border and padding take 4 cells, the "▌ " mark 2 and the name 10.
-		label := fmt.Sprintf("%-9s %s", t.Name(), lipgloss.PlaceHorizontal(sideW-16, lipgloss.Right, count))
+		// The panel's border and padding take 4 cells, the "▌ " mark 2, the name 8, the tag 4
+		// and the flag 2.
+		label := fmt.Sprintf("%-8s%-4s%*s %s", t.Name(), tag, max(sideW-20, 0), count, flag)
+		label = ansi.Truncate(label, max(sideW-6, 0), "")
 		if i == m.on {
 			side = append(side, theme.Accent.Render("▌ "+label))
 		} else {
@@ -275,7 +279,7 @@ func (m Model) viewMain() string {
 	// While it has focus, the sidebar keeps its keys at the bottom. (The filler string adds
 	// one line more than its newlines.)
 	if !m.inBody {
-		foot := []string{"↑/k      up", "↓/j      down", "→/enter  open", "r        reload", "s        save", "esc/q    quit"}
+		foot := []string{"↑/k      up", "↓/j      down", "→/enter  open", "R        reload", "s        save", "esc/q    quit"}
 		inner := m.h - sideStyle.GetVerticalFrameSize()
 		side = append(side, strings.Repeat("\n", max(inner-len(side)-len(foot)-1, 0)))
 		side = append(side, theme.Dim.Render(strings.Join(foot, "\n")))

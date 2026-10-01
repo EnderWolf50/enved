@@ -88,6 +88,10 @@ func (m *Model) updateInput(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 		at := b.at
+		if !b.adding && m.entries[at].value == v {
+			return nil
+		}
+		m.remember()
 		if b.adding {
 			m.entries = slices.Insert(m.entries, at, &entry{value: v})
 		} else {

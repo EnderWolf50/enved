@@ -23,9 +23,41 @@ func TestResetAlignsTextEdits(t *testing.T) {
 	if !slices.Equal(m.Result(), []string{"c", "a"}) || !m.Dirty() {
 		t.Fatalf("result %q", m.Result())
 	}
-	m.Undo()
+	m.UndoAll()
 	if m.Dirty() {
-		t.Fatal("Undo left changes")
+		t.Fatal("UndoAll left changes")
+	}
+	if !m.Undo() || !slices.Equal(m.Result(), []string{"c", "a"}) {
+		t.Fatalf("u after UndoAll did not bring the changes back: %q", m.Result())
+	}
+}
+
+func TestUndoOneStepAtATime(t *testing.T) {
+	m := New("t", Text, []string{"a", "b"}, []string{"a", "b"}, nil)
+	m.Resize(80, 20)
+	m.Focus(true)
+	press := func(ks ...string) {
+		for _, k := range ks {
+			msg := tea.KeyPressMsg{Code: rune(k[0]), Text: k}
+			if k == "enter" {
+				msg = tea.KeyPressMsg{Code: tea.KeyEnter}
+			}
+			m.Update(msg)
+		}
+	}
+	press("a", "c", "enter")                                          // a, c, b
+	press("J")                                                        // a, b, c
+	press("k", "d")                                                   // b removed
+	steps := [][]string{{"a", "b"}, {"a", "c", "b"}, {"a", "b", "c"}} // before each change
+	for i := len(steps) - 1; i >= 0; i-- {
+		press("u")
+		if want := steps[i]; !slices.Equal(m.Result(), want) {
+			t.Fatalf("undo %d: %q, want %q", len(steps)-i, m.Result(), want)
+		}
+	}
+	press("u")
+	if m.Status() != "nothing to undo" {
+		t.Fatalf("status %q", m.Status())
 	}
 }
 

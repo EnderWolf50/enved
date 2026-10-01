@@ -57,21 +57,22 @@ func (e *entry) change() theme.Change {
 }
 
 var (
-	keyUp     = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	keyDown   = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
-	keyMoveUp = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
-	keyMoveDn = key.NewBinding(key.WithKeys("J", "shift+down"))
-	keyAppend = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
-	keyInsert = key.NewBinding(key.WithKeys("i"))
-	keyEdit   = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
-	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
-	keyClean  = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
-	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo all"))
-	keyOpen   = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
-	keyFilter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	keyReload = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload"))
-	keySave   = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
-	keyBack   = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
+	keyUp      = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
+	keyDown    = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
+	keyMoveUp  = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
+	keyMoveDn  = key.NewBinding(key.WithKeys("J", "shift+down"))
+	keyAppend  = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
+	keyInsert  = key.NewBinding(key.WithKeys("i"))
+	keyEdit    = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
+	keyRemove  = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
+	keyClean   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
+	keyUndo    = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
+	keyUndoAll = key.NewBinding(key.WithKeys("U"))
+	keyOpen    = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
+	keyFilter  = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
+	keyReload  = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
+	keySave    = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
+	keyBack    = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
 // Model is one list being edited.
@@ -92,8 +93,42 @@ type Model struct {
 	help    help.Model
 	input   *inputBox
 	focused bool
-	w, h    int    // the body's size
-	status  string // a one-off note, cleared by the next key
+	w, h    int        // the body's size
+	status  string     // a one-off note, cleared by the next key
+	history []Snapshot // the entries before each change, for u
+	edits   int        // how many changes were made, undos included
+}
+
+// Snapshot is the entries at one moment, for undo.
+type Snapshot struct{ entries []entry }
+
+// Snapshot copies the entries as they are now.
+func (m *Model) Snapshot() Snapshot {
+	s := Snapshot{entries: make([]entry, len(m.entries))}
+	for i, e := range m.entries {
+		s.entries[i] = *e
+	}
+	return s
+}
+
+// Restore puts the entries back as they were in s.
+func (m *Model) Restore(s Snapshot) {
+	m.entries = make([]*entry, len(s.entries))
+	for i := range s.entries {
+		e := s.entries[i]
+		m.entries[i] = &e
+	}
+	m.refresh()
+}
+
+// Edits counts the changes made so far: a holder compares it before and after a key to
+// learn whether the key changed the list.
+func (m *Model) Edits() int { return m.edits }
+
+// remember keeps the entries as they are, before a change.
+func (m *Model) remember() {
+	m.history = append(m.history, m.Snapshot())
+	m.edits++
 }
 
 // New is an editor for a list saved as saved and now current (the same, unless it was
@@ -112,7 +147,7 @@ func New(title string, kind Kind, saved, current []string, exists func(string) b
 // Reset starts over from a list saved as saved and now current. Entries of current found in
 // saved count as kept; saved ones current lacks are shown removed, near where they were.
 func (m *Model) Reset(saved, current []string) {
-	m.saved, m.entries = slices.Clone(saved), nil
+	m.saved, m.entries, m.history = slices.Clone(saved), nil, nil
 	unused := slices.Clone(saved)
 	for _, v := range current {
 		e := &entry{value: v}
@@ -208,11 +243,19 @@ func (m *Model) health() (problem []string, dupOf []int) {
 // Clean marks every entry with a problem, and every repeat, for removal; it says how many.
 func (m *Model) Clean() int {
 	problem, dupOf := m.health()
+	bad := func(i int) bool { return !m.entries[i].removed && (problem[i] != "" || dupOf[i] > 0) }
 	n := 0
-	for i, e := range m.entries {
-		if !e.removed && (problem[i] != "" || dupOf[i] > 0) {
-			e.removed = true
+	for i := range m.entries {
+		if bad(i) {
 			n++
+		}
+	}
+	if n > 0 {
+		m.remember()
+	}
+	for i, e := range m.entries {
+		if bad(i) {
+			e.removed = true
 		}
 	}
 	m.redraw()
@@ -354,8 +397,28 @@ func (m *Model) editable() bool {
 	return true
 }
 
-// Undo drops every change.
-func (m *Model) Undo() { m.Reset(m.saved, m.saved) }
+// Undo takes back the last change; false when there is none.
+func (m *Model) Undo() bool {
+	if len(m.history) == 0 {
+		return false
+	}
+	last := m.history[len(m.history)-1]
+	m.history = m.history[:len(m.history)-1]
+	m.edits++
+	m.Restore(last)
+	return true
+}
+
+// UndoAll drops every change, as one step u can take back.
+func (m *Model) UndoAll() {
+	if m.Pending() == 0 {
+		return
+	}
+	was, h := m.Snapshot(), m.history
+	m.Reset(m.saved, m.saved)
+	m.history = append(h, was)
+	m.edits++
+}
 
 func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 	e, i, ok := m.current()
@@ -388,6 +451,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 	case key.Matches(msg, keyRemove):
 		if ok && m.editable() {
+			m.remember()
 			if e.added() { // never saved: nothing to keep around
 				m.entries = slices.Delete(m.entries, i, i+1)
 				m.refresh()
@@ -404,6 +468,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 		default:
 			to := i + pick(key.Matches(msg, keyMoveDn), 1, -1)
 			if to >= 0 && to < len(m.entries) {
+				m.remember()
 				m.entries[i], m.entries[to] = m.entries[to], m.entries[i]
 				m.table.SetCursor(to)
 				m.refresh()
@@ -415,8 +480,12 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 	case key.Matches(msg, keyUndo):
 		if m.editable() {
-			m.Undo()
-			m.status = "changes undone"
+			m.status = pick(m.Undo(), "undone", "nothing to undo")
+		}
+	case key.Matches(msg, keyUndoAll):
+		if m.editable() {
+			m.status = pick(m.Pending() > 0, "every change undone · u brings them back", "nothing to undo")
+			m.UndoAll()
 		}
 	default:
 		var cmd tea.Cmd

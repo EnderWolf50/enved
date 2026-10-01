@@ -68,7 +68,7 @@ func (p *listPrefs) kind(name string) (listedit.Kind, bool) {
 	return k, known
 }
 
-// toggle switches a variable between list and text, and keeps the choice.
+// toggle marks a variable a list or text, the other way round, and keeps the choice.
 func (p *listPrefs) toggle(name string) error {
 	_, isList := p.kind(name)
 	k := winenv.Key(name)

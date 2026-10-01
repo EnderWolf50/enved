@@ -165,13 +165,18 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 		return nil, frame.Reload
 	case key.Matches(k, keySave):
 		return nil, frame.Save
-	case key.Matches(k, keyCopy):
+	case key.Matches(k, keyCopy, keyCopyName):
 		if i := t.current(); i >= 0 {
-			t.status = "copied " + t.vars[i].Name
-			return tea.SetClipboard(t.vars[i].Data), frame.None
+			v := t.vars[i]
+			if key.Matches(k, keyCopyName) {
+				t.status = "copied the name " + v.Name
+				return tea.SetClipboard(v.Name), frame.None
+			}
+			t.status = "copied the value of " + v.Name
+			return tea.SetClipboard(v.Data), frame.None
 		}
 		return nil, frame.None
-	case key.Matches(k, keyAdd, keyEdit, keyRemove, keyRename, keyType):
+	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyUndoAll):
 		t.status = "this process's environment is read-only"
 		return nil, frame.None
 	}

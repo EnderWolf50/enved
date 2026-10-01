@@ -16,7 +16,7 @@ sidebar_width = 24
 
 # Variables to edit as lists (entries split at ;) or as text, whatever enved would guess.
 # It guesses lists for Path, PATHEXT, PSModulePath, INCLUDE, LIB, LIBPATH and CLASSPATH.
-# The L key switches one too, and keeps that in %LOCALAPPDATA%\enved\lists.toml.
+# The L key marks one either way too, and keeps that in %LOCALAPPDATA%\enved\lists.toml.
 lists     = []
 not_lists = []
 

@@ -159,6 +159,10 @@ func (d *varDialog) switchField() tea.Cmd {
 // keep applies what the dialog was given.
 func (t *varTab) keep(d *varDialog) {
 	v := d.v
+	if (d.mode == dialogValue && v.value.Data == d.value.Value()) || (d.mode == dialogName && v.name == d.name.Value()) {
+		return // nothing changed: no step to undo
+	}
+	t.remember()
 	switch d.mode {
 	case dialogAdd:
 		typ := pick(strings.Contains(d.value.Value(), "%"), winenv.ExpandSZ, winenv.SZ)

@@ -33,7 +33,7 @@ the GitHub account used it.
 - **Machine variables through UAC**: editable without admin; saving starts an elevated copy
   with the change on its command line (pathed v0.3.0 does exactly this), and a declined
   prompt marks the scope and keeps its changes.
-- `/` filter, `r` reload, `u` undo, a quit dialog that only asks about unsaved changes, a
+- `/` filter, `R` reload, `u` undo, a quit dialog that only asks about unsaved changes, a
   TOML settings file with the theme (`enved --default-config`), and chezmoi rendering that
   theme from `themes.toml`.
 
@@ -105,16 +105,16 @@ it.
 
 ```
 ╭ enved ───────────────╮╭ User · 23 variables · 2 changes ──────────────────────────────╮
-│ ▸ User            *  ││ NAME                 VALUE                            %  KIND │
-│   Machine       uac  ││ GOPATH               %USERPROFILE%\go                 %       │
-│   Process        ro  ││ JAVA_HOME            C:\Program Files\Java\jdk-25             │
+│ ▸ User          23 * ││ NAME                 VALUE                            %  KIND │
+│   Machine uac   12   ││ GOPATH               %USERPROFILE%\go                 %       │
+│   Process ro         ││ JAVA_HOME            C:\Program Files\Java\jdk-25             │
 │                      ││ Path                 C:\Users\me\bin; … (14)          %  list │
 │                      ││ TEMP                 %USERPROFILE%\AppData\Local\Temp %   sys │
 │                      │├────────────────────────────────────────────────────────────────┤
 │                      ││ JAVA_HOME = C:\Program Files\Java\jdk-25                       │
 │                      ││ REG_SZ · used by: Path (entry 3)                               │
 ╰──────────────────────╯╰────────────────────────────────────────────────────────────────╯
- a add · enter edit · d remove · n rename · x %expand · L as list/text · / filter · s save
+ enter edit · e as text · a add · d remove · r rename · x %expand · L list on/off · u undo
 ```
 
 - **Table**: name, the value on one line (a list shows its first entry and a count), `%` for
@@ -127,12 +127,14 @@ it.
 - **Editing** a text value opens a field in a dialog, as pathed's entry editor does; `enter`
   on a list variable replaces the table with the list editor for that value (pathed's
   screen, heading `User › Path`), and `esc` comes back with its changes marked on the row.
-- **Keys** in the table: `a` add, `enter`/`e` edit, `d` remove or keep again, `n` rename
-  (a remove plus an add, shown as one change), `x` switch `REG_SZ`/`REG_EXPAND_SZ`, `L`
-  edit in the other form (list or text) at once, and from then on, `y` copy the value, `u`
-  undo this scope, `/`, `r`, `s` as in pathed. In the list editor, `a` and `i` add after and
-  before the cursor, and `L` goes back to editing the value as text; `x` does nothing there,
-  so it never means two things.
+- **Keys** in the table: `a` add, `enter` edit (a list in the list editor), `e` edit as
+  text, `d` remove or keep again, `r` rename (a remove plus an add, shown as one change), `x`
+  switch `REG_SZ`/`REG_EXPAND_SZ`, `L` mark a list or text (it only sets what `enter` opens,
+  as `x` only sets the type), `y`/`Y` copy the value/name, `u` undo the last change and `U`
+  every change, `/`, `R` reload, `s` save. In the list editor, `a` and `i` add after and
+  before the cursor; `x` does nothing there, so it never means two things.
+- **Undo** is one history per scope, the list editors' changes included: `u` takes back
+  the last change wherever it was made, `U` is itself a step `u` can take back.
 - A value typed with a `%` in it becomes `REG_EXPAND_SZ` unless the user switched it with
   `x`; the review shows every type change.
 - Names are checked as they are typed: not empty, no `=`, not already in this scope

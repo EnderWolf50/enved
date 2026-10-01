@@ -64,20 +64,23 @@ func (v *variable) fold() {
 }
 
 var (
-	keyUp     = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	keyDown   = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
-	keyAdd    = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add"))
-	keyEdit   = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
-	keyRename = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "rename"))
-	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
-	keyType   = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "%expand"))
-	keyList   = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "edit as list/text"))
-	keyCopy   = key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy"))
-	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo all"))
-	keyFilter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	keyReload = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload"))
-	keySave   = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
-	keyBack   = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
+	keyUp       = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
+	keyDown     = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
+	keyAdd      = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add"))
+	keyEdit     = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit"))
+	keyText     = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit as text"))
+	keyRename   = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename"))
+	keyRemove   = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
+	keyType     = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "%expand"))
+	keyList     = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "list on/off"))
+	keyCopy     = key.NewBinding(key.WithKeys("y"), key.WithHelp("y/Y", "copy value/name"))
+	keyCopyName = key.NewBinding(key.WithKeys("Y"))
+	keyUndo     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
+	keyUndoAll  = key.NewBinding(key.WithKeys("U"))
+	keyFilter   = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
+	keyReload   = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
+	keySave     = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
+	keyBack     = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
 // varTab is one scope's variables: the table, and the list editor of one of them when open.
@@ -92,9 +95,54 @@ type varTab struct {
 	needsAdmin bool  // saving it asks for admin (UAC)
 
 	grid
-	open   *variable // the variable whose list editor is showing
-	dialog *varDialog
-	status string
+	open    *variable // the variable whose list editor is showing
+	dialog  *varDialog
+	status  string
+	history [][]varState // the variables before each change, for u
+}
+
+// varState is one variable at one moment, for undo: its fields, and its list's entries.
+type varState struct {
+	v    *variable
+	was  variable
+	list listedit.Snapshot
+}
+
+func (t *varTab) snapshot() []varState {
+	out := make([]varState, len(t.vars))
+	for i, v := range t.vars {
+		out[i] = varState{v: v, was: *v}
+		if v.list != nil {
+			out[i].list = v.list.Snapshot()
+		}
+	}
+	return out
+}
+
+// remember keeps the variables as they are, before a change.
+func (t *varTab) remember() { t.history = append(t.history, t.snapshot()) }
+
+// undo takes back the last change, in the table or in a list editor.
+func (t *varTab) undo() {
+	if len(t.history) == 0 {
+		t.status = "nothing to undo"
+		return
+	}
+	last := t.history[len(t.history)-1]
+	t.history = t.history[:len(t.history)-1]
+	t.vars = make([]*variable, len(last))
+	for i, s := range last {
+		*s.v = s.was
+		if s.v.list != nil {
+			s.v.list.Restore(s.list)
+		}
+		t.vars[i] = s.v
+	}
+	if t.open != nil && (t.open.list == nil || !slices.Contains(t.vars, t.open)) {
+		t.open = nil // the step undone came before the list editor was opened
+	}
+	t.status = "undone"
+	t.refresh()
 }
 
 func newVarTab(s winenv.Scope, st winenv.Store, prefs *listPrefs) *varTab {
@@ -123,6 +171,7 @@ func (t *varTab) Count() string {
 func (t *varTab) Load() {
 	t.saved, t.err = t.st.ReadAll(t.scope)
 	t.needsAdmin = !t.st.CanWrite(t.scope)
+	t.history = nil
 	t.reset()
 }
 
@@ -360,13 +409,17 @@ func (t *varTab) editable() bool {
 
 func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
-		// L in the list editor: this variable is text after all.
-		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyList) && !t.open.list.Busy() {
-			v := t.open
-			t.closeList()
-			return t.switchForm(v), frame.None
+		// u in the list editor takes back the scope's last change, so one history covers
+		// the table and every list.
+		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo) && !t.open.list.Busy() {
+			t.undo()
+			return nil, frame.None
 		}
-		cmd, ev := t.open.list.Update(msg)
+		list, edits, before := t.open.list, t.open.list.Edits(), t.snapshot()
+		cmd, ev := list.Update(msg)
+		if list.Edits() != edits {
+			t.history = append(t.history, before)
+		}
 		if ev == listedit.Back {
 			t.closeList()
 			return cmd, frame.None
@@ -415,20 +468,25 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		return t.filter.Focus(), frame.None
 	case key.Matches(msg, keyCopy):
 		if v != nil {
-			t.status = "copied " + v.name
+			t.status = "copied the value of " + v.name
 			return tea.SetClipboard(v.current().Data), frame.None
+		}
+	case key.Matches(msg, keyCopyName):
+		if v != nil {
+			t.status = "copied the name " + v.name
+			return tea.SetClipboard(v.name), frame.None
 		}
 	case key.Matches(msg, keyAdd):
 		if t.editable() {
 			return t.openDialog(dialogAdd, nil), frame.None
 		}
-	case key.Matches(msg, keyEdit):
+	case key.Matches(msg, keyEdit, keyText):
 		if v != nil && t.editable() {
 			if v.removed {
 				t.status = "removed: d keeps it first"
 				return nil, frame.None
 			}
-			if kind, isList := t.prefs.kind(v.name); isList {
+			if kind, isList := t.prefs.kind(v.name); isList && key.Matches(msg, keyEdit) {
 				return t.openList(v, kind), frame.None
 			}
 			return t.openDialog(dialogValue, v), frame.None
@@ -439,13 +497,14 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		}
 	case key.Matches(msg, keyRemove):
 		if v != nil && t.editable() {
+			if v.removed && t.find(v.name, v) != nil {
+				t.status = "another variable is named " + v.name + " now"
+				return nil, frame.None
+			}
+			t.remember()
 			if v.orig == nil { // never saved: nothing to keep around
 				t.vars = slices.DeleteFunc(t.vars, func(w *variable) bool { return w == v })
 				t.refresh()
-				return nil, frame.None
-			}
-			if v.removed && t.find(v.name, v) != nil {
-				t.status = "another variable is named " + v.name + " now"
 				return nil, frame.None
 			}
 			v.removed = !v.removed
@@ -453,6 +512,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		}
 	case key.Matches(msg, keyType):
 		if v != nil && !v.removed && t.editable() {
+			t.remember()
 			v.fold()
 			v.typeSet = true
 			v.value.Type = pick(v.value.Expands(), winenv.SZ, winenv.ExpandSZ)
@@ -462,16 +522,19 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 			t.redraw()
 		}
 	case key.Matches(msg, keyList):
-		if v != nil && t.editable() {
-			if v.removed {
-				t.status = "removed: d keeps it first"
-				return nil, frame.None
-			}
-			return t.switchForm(v), frame.None
+		if v != nil {
+			t.toggleList(v)
 		}
 	case key.Matches(msg, keyUndo):
+		t.undo()
+	case key.Matches(msg, keyUndoAll):
+		if !t.Dirty() {
+			t.status = "nothing to undo"
+			return nil, frame.None
+		}
+		t.remember()
 		t.reset()
-		t.status = "changes undone"
+		t.status = "every change undone · u brings them back"
 	default:
 		var cmd tea.Cmd
 		t.table, cmd = t.table.Update(msg)
@@ -481,18 +544,20 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	return nil, frame.None
 }
 
-// switchForm edits a variable in the other form, list or text, and remembers that: L opens
-// the editor that the variable's enter will open from now on.
-func (t *varTab) switchForm(v *variable) tea.Cmd {
+// toggleList marks a variable as a list or as text, and keeps the choice: it says which
+// editor enter opens. Like x, it opens nothing.
+func (t *varTab) toggleList(v *variable) {
 	if err := t.prefs.toggle(v.name); err != nil {
 		t.status = "could not keep the choice: " + err.Error()
+		return
+	}
+	if _, isList := t.prefs.kind(v.name); isList {
+		t.status = v.name + " is a list now: enter edits its entries"
+	} else {
+		v.fold()
+		t.status = v.name + " is text now: enter edits it as one value"
 	}
 	t.redraw()
-	if kind, isList := t.prefs.kind(v.name); isList {
-		return t.openList(v, kind)
-	}
-	v.fold()
-	return t.openDialog(dialogValue, v)
 }
 
 // openList shows the list editor for a variable, keeping the changes made in it before.
@@ -506,7 +571,6 @@ func (t *varTab) openList(v *variable, kind listedit.Kind) tea.Cmd {
 		v.list, v.listKind = listedit.New(title, kind, saved, winenv.Split(v.current().Data), nil), kind
 	}
 	v.list.Title = title
-	v.list.ExtraKeys = []key.Binding{key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "edit as text"))}
 	v.list.Resize(t.w, t.h)
 	v.list.Focus(true)
 	t.open = v
@@ -607,7 +671,7 @@ func (t *varTab) Body() string {
 		}
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
-	keys := []key.Binding{keyUp, keyDown, keyEdit, keyAdd, keyRemove, keyRename, keyType, keyList, keySave, keyBack, keyCopy, keyUndo, keyFilter, keyReload}
+	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keySave, keyBack, keyCopy, keyFilter, keyReload}
 	if t.filter.Focused() {
 		keys = []key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
