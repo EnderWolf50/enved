@@ -693,7 +693,7 @@ func (t *varTab) Body() string {
 	return strings.Join([]string{
 		t.filterLine(),
 		body, "",
-		theme.Divider(width, theme.Legend(true, "Windows relies on it", "")),
+		theme.Divider(width, theme.Legend(true, "system", "")),
 		strings.Join(detail, "\n"),
 		help,
 	}, "\n")

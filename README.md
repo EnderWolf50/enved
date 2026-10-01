@@ -41,8 +41,8 @@ variable's type; a new one is `REG_EXPAND_SZ` when its value holds a `%`. Removi
 Windows relies on (`SystemRoot`, `ComSpec`, `TEMP`, `Path`, ...) needs `--force`.
 
 In the editor the sidebar holds User, Machine and Process, each with its number of variables
-(a `uac` badge: saving asks for admin; `ro`: read-only; `*` unsaved changes, `!` could not
-be read or saved); `enter` opens one. Changes
+(an `admin` badge: saving asks for admin through UAC; `read-only`: it cannot be changed; `*`
+unsaved changes, `!` could not be read or saved); `enter` opens one. Changes
 are only marked until you save: added variables show green, edited ones amber, removed ones
 red and struck through. An unchanged row worth a look gets a light tint: blue-gray for a
 fact to keep in mind (a system variable; in Process, a stale value), violet for a problem

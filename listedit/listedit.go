@@ -639,6 +639,7 @@ func (m *Model) footer() string {
 // Review lists every change, for the review before saving.
 func (m *Model) Review() []string {
 	var lines []string
+	moved, was := m.moved()
 	for i, e := range m.entries {
 		n := fmt.Sprintf("#%-3d ", i+1)
 		switch e.change() {
@@ -649,9 +650,53 @@ func (m *Model) Review() []string {
 		case theme.Edited:
 			lines = append(lines, theme.Warn.Render("  ~ ")+theme.Dim.Render(n)+e.orig+theme.Dim.Render("  →  ")+e.value)
 		}
-	}
-	if m.Reordered() {
-		lines = append(lines, theme.Dim.Render("  ↕ the order changes"))
+		if moved[i] {
+			lines = append(lines, theme.Accent.Render("  ↕ ")+theme.Dim.Render(n)+e.value+theme.Dim.Render(fmt.Sprintf("  was #%d", was[i]+1)))
+		}
 	}
 	return lines
+}
+
+// moved picks the kept entries that were moved: the fewest whose moving explains the new
+// order, so moving one entry to the end names that one, not every entry it passed. was is
+// where each entry stood in the saved list.
+func (m *Model) moved() (moved map[int]bool, was map[int]int) {
+	used := make([]bool, len(m.saved))
+	var kept []int // positions in entries, in their new order
+	was = map[int]int{}
+	for i, e := range m.entries {
+		if e.added() || e.removed {
+			continue
+		}
+		for j, v := range m.saved {
+			if !used[j] && v == e.orig {
+				used[j], was[i] = true, j
+				kept = append(kept, i)
+				break
+			}
+		}
+	}
+	// The longest run of kept entries still in their saved order stays; the rest moved.
+	// ponytail: O(n²), fine for lists of a few hundred entries.
+	best, prev := make([]int, len(kept)), make([]int, len(kept))
+	end := -1
+	for a := range kept {
+		best[a], prev[a] = 1, -1
+		for b := range a {
+			if was[kept[b]] < was[kept[a]] && best[b]+1 > best[a] {
+				best[a], prev[a] = best[b]+1, b
+			}
+		}
+		if end < 0 || best[a] > best[end] {
+			end = a
+		}
+	}
+	moved = map[int]bool{}
+	for _, i := range kept {
+		moved[i] = true
+	}
+	for a := end; a >= 0; a = prev[a] {
+		delete(moved, kept[a])
+	}
+	return moved, was
 }

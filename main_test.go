@@ -265,7 +265,7 @@ func TestPathInTheListEditor(t *testing.T) {
 func TestMachineDeclinedKeepsChanges(t *testing.T) {
 	st, saved := fakeStore(map[string]string{"A": "1"}, map[string]string{"M": "x"})
 	m := testModel(t, st)
-	if !strings.Contains(screen(m), "uac") {
+	if !strings.Contains(screen(m), "Machine  admin") {
 		t.Fatal("the sidebar does not say Machine asks for UAC")
 	}
 	m = press(m, "j", "enter", "d", "esc", "k", "enter", "d", "s")

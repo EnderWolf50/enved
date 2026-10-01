@@ -170,3 +170,27 @@ func TestAppendAndInsert(t *testing.T) {
 		t.Fatalf("empty list: %q", e.Result())
 	}
 }
+
+func TestReviewNamesTheMovedEntries(t *testing.T) {
+	saved := []string{"a", "b", "c", "d"}
+	for _, tc := range []struct {
+		now  []string
+		want []string // the entries the review says moved
+	}{
+		{[]string{"b", "c", "d", "a"}, []string{"a"}},           // a to the end: only a
+		{[]string{"a", "c", "b", "d"}, []string{"b"}},           // a swap: one of the pair
+		{[]string{"x", "a", "b", "c", "d"}, nil},                // an entry added before: nothing moved
+		{[]string{"d", "c", "b", "a"}, []string{"c", "b", "a"}}, // reversed
+	} {
+		m := New("t", Text, saved, tc.now, nil)
+		var got []string
+		for _, l := range m.Review() {
+			if l = ansi.Strip(l); strings.Contains(l, "↕") {
+				got = append(got, strings.Fields(l)[2])
+			}
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%q: moved %q, want %q", tc.now, got, tc.want)
+		}
+	}
+}

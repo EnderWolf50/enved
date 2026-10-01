@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -33,7 +34,7 @@ func newProcessTab(scopes []*varTab) *processTab {
 
 func (t *processTab) Name() string             { return "Process" }
 func (t *processTab) Label() string            { return "This process" }
-func (t *processTab) Count() string            { return "" }
+func (t *processTab) Count() string            { return fmt.Sprint(len(t.vars)) }
 func (t *processTab) Err() error               { return nil }
 func (t *processTab) ReadOnly() bool           { return true }
 func (t *processTab) NeedsAdmin() bool         { return false }
@@ -226,7 +227,7 @@ func (t *processTab) Body() string {
 	return strings.Join([]string{
 		t.filterLine(),
 		t.table.View(), "",
-		theme.Divider(width, theme.Legend(false, "stale: this process has an old value", "")),
+		theme.Divider(width, theme.Legend(false, "stale", "")),
 		strings.Join(detail, "\n"),
 		help,
 	}, "\n")

@@ -244,7 +244,7 @@ func (m Model) viewMain() string {
 	sideW := m.opts.SidebarWidth
 	var side []string
 	for i, t := range m.tabs {
-		// The name and a uac/ro badge on the left; the count and a flag (! or *) in fixed
+		// The name and an admin/read-only badge on the left; the count and a flag (! or *) in fixed
 		// columns on the right, so the counts line up.
 		style, mark := theme.Dim, "  "
 		if i == m.on {
@@ -253,9 +253,9 @@ func (m Model) viewMain() string {
 		left := style.Render(mark + t.Name())
 		switch {
 		case t.ReadOnly():
-			left += " " + theme.Badge.Render("ro")
+			left += " " + theme.Badge.Render("read-only")
 		case t.NeedsAdmin():
-			left += " " + theme.Badge.Render("uac")
+			left += " " + theme.Badge.Render("admin")
 		}
 		count, flag := t.Count(), " "
 		switch {
@@ -266,9 +266,9 @@ func (m Model) viewMain() string {
 		case t.Dirty():
 			flag = style.Render("*")
 		}
-		// The panel's border and padding take 4 cells; the count 3, a space and the flag 2.
+		// The panel's border and padding take 4 cells; a space, the count 3 and the flag 1.
 		inner := max(sideW-4, 0)
-		row := lipgloss.PlaceHorizontal(max(inner-5, 0), lipgloss.Left, left) + style.Render(fmt.Sprintf("%3s ", count)) + flag
+		row := lipgloss.PlaceHorizontal(max(inner-5, 0), lipgloss.Left, left) + style.Render(fmt.Sprintf(" %3s", count)) + flag
 		side = append(side, ansi.Truncate(row, inner, ""))
 	}
 
