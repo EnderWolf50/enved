@@ -128,8 +128,8 @@ func (t *processTab) redraw() {
 	cols := t.table.Columns()
 	t.paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
-		r := theme.NewRow(theme.Unchanged, cursor)
 		state := t.state(v)
+		r := theme.NewRow(theme.Unchanged, state == "stale", cursor)
 		style := pick(state == "stale", theme.Warn, theme.Dim)
 		return r.Cells(cols, r.Mark(theme.Unchanged, cursor), r.Paint(lipgloss.NewStyle(), v.Name),
 			r.Paint(lipgloss.NewStyle(), v.Data), r.Paint(style, state))
@@ -223,7 +223,7 @@ func (t *processTab) Body() string {
 	return strings.Join([]string{
 		t.filterLine(),
 		t.table.View(), "",
-		theme.Faint.Render(strings.Repeat("─", width)),
+		theme.Divider(width, theme.Legend(false, "stale: this process has an old value")),
 		strings.Join(detail, "\n"),
 		ansi.Truncate(t.help.ShortHelpView(keys), width, "…"),
 	}, "\n")

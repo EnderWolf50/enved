@@ -26,7 +26,8 @@ ok     = "#99ffe4" # what is fine: a folder that exists, success
 bad    = "#ff8080" # what is wrong: a missing folder, errors, the quit dialog
 warn   = "#ffc799" # what to look at: duplicates, system variables
 
-# Row backgrounds: the cursor row, and rows changed since the last save.
+# Row backgrounds: the cursor row, rows changed since the last save, and rows to look at
+# (a system variable, a missing folder, a duplicate, a stale value).
 row_cursor          = "#262626"
 row_added           = "#16241f"
 row_added_cursor    = "#223a30"
@@ -34,6 +35,8 @@ row_edited          = "#3a2c12"
 row_edited_cursor   = "#4d3b19"
 row_removed         = "#2e1616"
 row_removed_cursor  = "#432020"
+row_note            = "#1b2130"
+row_note_cursor     = "#283046"
 `
 
 // Theme is the [theme] section.
@@ -51,6 +54,8 @@ type Theme struct {
 	RowEditedCursor  string `toml:"row_edited_cursor"`
 	RowRemoved       string `toml:"row_removed"`
 	RowRemovedCursor string `toml:"row_removed_cursor"`
+	RowNote          string `toml:"row_note"`
+	RowNoteCursor    string `toml:"row_note_cursor"`
 }
 
 func (t Theme) colors() map[string]string {
@@ -59,6 +64,7 @@ func (t Theme) colors() map[string]string {
 		"row_cursor": t.RowCursor, "row_added": t.RowAdded, "row_added_cursor": t.RowAddedCursor,
 		"row_edited": t.RowEdited, "row_edited_cursor": t.RowEditedCursor,
 		"row_removed": t.RowRemoved, "row_removed_cursor": t.RowRemovedCursor,
+		"row_note": t.RowNote, "row_note_cursor": t.RowNoteCursor,
 	}
 }
 
@@ -141,6 +147,7 @@ var (
 	bgAdded, bgAddedCursor     color.Color
 	bgEdited, bgEditedCursor   color.Color
 	bgRemoved, bgRemovedCursor color.Color
+	bgNote, bgNoteCursor       color.Color
 
 	Accent, OK, Err, Warn, Dim, Faint lipgloss.Style
 	Panel, Modal, Dialog              lipgloss.Style
@@ -169,6 +176,7 @@ func Apply(t Theme) {
 	bgAdded, bgAddedCursor = c(t.RowAdded), c(t.RowAddedCursor)
 	bgEdited, bgEditedCursor = c(t.RowEdited), c(t.RowEditedCursor)
 	bgRemoved, bgRemovedCursor = c(t.RowRemoved), c(t.RowRemovedCursor)
+	bgNote, bgNoteCursor = c(t.RowNote), c(t.RowNoteCursor)
 
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 	Accent = fg(ColorAccent).Bold(true)

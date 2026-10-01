@@ -44,7 +44,9 @@ In the editor the sidebar holds User, Machine and Process, each with its number 
 (a `uac` badge: saving asks for admin; `ro`: read-only; `*` unsaved changes, `!` could not
 be read or saved); `enter` opens one. Changes
 are only marked until you save: added variables show green, edited ones amber, removed ones
-red and struck through; `s` shows every change, and removing or emptying a system variable
+red and struck through; an unchanged row worth a look (a system variable; in a list, a
+missing folder or a duplicate; in Process, a stale value) gets a light blue-gray tint. The
+divider under the table carries the key to these colors; `s` shows every change, and removing or emptying a system variable
 asks a second time.
 
 | Key | In the variables |

@@ -3,6 +3,8 @@ package theme
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
 )
 
 type conf struct {
@@ -28,5 +30,29 @@ func TestParseMistakesAreErrors(t *testing.T) {
 	c, err := Parse(base, "[theme]\nok = \"42\"", check)
 	if err != nil || c.Theme.OK != "42" || c.Theme.Accent != "#ffc799" || c.Width != 20 {
 		t.Errorf("override: %+v, %v", c, err)
+	}
+}
+
+func TestDividerFitsItsWidth(t *testing.T) {
+	legend := Legend(true, "missing")
+	for _, w := range []int{0, 10, 40, 80, 120} {
+		if got := lipgloss.Width(Divider(w, legend)); got != w {
+			t.Errorf("width %d: the divider is %d wide", w, got)
+		}
+	}
+	if !strings.Contains(Divider(80, legend), "missing") {
+		t.Error("the legend is not on a wide divider")
+	}
+}
+
+func TestNoteTintsOnlyUnchangedRows(t *testing.T) {
+	if NewRow(Unchanged, true, false).bg.GetBackground() != bgNote {
+		t.Error("an unchanged row with a note is not tinted")
+	}
+	if NewRow(Removed, true, false).bg.GetBackground() != bgRemoved {
+		t.Error("a change's tint does not win over the note's")
+	}
+	if NewRow(Unchanged, true, true).bg.GetBackground() != bgNoteCursor {
+		t.Error("the cursor on a noted row lacks the note's cursor tint")
 	}
 }

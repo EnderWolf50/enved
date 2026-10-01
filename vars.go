@@ -362,7 +362,7 @@ func (t *varTab) redraw() {
 	cols := t.table.Columns()
 	t.paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
-		r := theme.NewRow(v.change(), cursor)
+		r := theme.NewRow(v.change(), isSystem(v.name), cursor)
 		plain := lipgloss.NewStyle()
 		name, value := r.Paint(plain, v.name), r.Paint(plain, t.shownValue(v))
 		if v.removed {
@@ -694,7 +694,7 @@ func (t *varTab) Body() string {
 	return strings.Join([]string{
 		t.filterLine(),
 		body, "",
-		theme.Faint.Render(strings.Repeat("─", width)),
+		theme.Divider(width, theme.Legend(true, "Windows relies on it")),
 		strings.Join(detail, "\n"),
 		ansi.Truncate(t.help.ShortHelpView(keys), width, "…"),
 	}, "\n")

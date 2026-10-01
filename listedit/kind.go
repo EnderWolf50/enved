@@ -99,3 +99,14 @@ func Exists(k Kind) func(string) bool {
 		return err == nil && (k != Folders || fi.IsDir())
 	}
 }
+
+// noted says what the light row tint marks in a list of this kind, for the legend.
+func (k Kind) noted() string {
+	switch {
+	case k == Extensions:
+		return "not an extension, or a duplicate"
+	case k.onDisk():
+		return "missing, or a duplicate"
+	}
+	return "a duplicate"
+}

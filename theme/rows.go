@@ -1,6 +1,9 @@
 package theme
 
 import (
+	"image/color"
+	"strings"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	"charm.land/lipgloss/v2"
@@ -26,8 +29,10 @@ func (c Change) Sign() string {
 // every piece of the row is painted with it: each colored run and each cell's padding.
 type Row struct{ bg lipgloss.Style }
 
-// NewRow is a row with the background for its change, under the cursor or not.
-func NewRow(c Change, cursor bool) Row {
+// NewRow is a row with the background for its change, under the cursor or not. An
+// unchanged row with a note (something to look at: a missing folder, a system variable)
+// gets a light tint of its own.
+func NewRow(c Change, note, cursor bool) Row {
 	var bg lipgloss.Style
 	switch {
 	case c == Removed:
@@ -36,6 +41,8 @@ func NewRow(c Change, cursor bool) Row {
 		bg = bg.Background(pick(cursor, bgAddedCursor, bgAdded))
 	case c == Edited:
 		bg = bg.Background(pick(cursor, bgEditedCursor, bgEdited))
+	case note:
+		bg = bg.Background(pick(cursor, bgNoteCursor, bgNote))
 	case cursor:
 		bg = bg.Background(bgCursor)
 	}
@@ -66,6 +73,31 @@ func (r Row) Cells(cols []table.Column, cells ...string) table.Row {
 		cells[c] = r.bg.Width(w).Padding(0, 1).Render(ansi.Truncate(cells[c], max(w-2, 0), r.Paint(lipgloss.NewStyle(), "…")))
 	}
 	return cells
+}
+
+// Legend is the key to the row tints, for Divider: a swatch of each one and its meaning.
+// changes adds added, edited and removed; note names what the light tint marks, if any.
+func Legend(changes bool, note string) string {
+	swatch := func(bg color.Color, what string) string {
+		return lipgloss.NewStyle().Background(bg).Render("  ") + Dim.Render(" "+what)
+	}
+	var items []string
+	if changes {
+		items = append(items, swatch(bgAdded, "added"), swatch(bgEdited, "edited"), swatch(bgRemoved, "removed"))
+	}
+	if note != "" {
+		items = append(items, swatch(bgNote, note))
+	}
+	return strings.Join(items, "  ")
+}
+
+// Divider is a line across the body with the legend at its right end, when it fits.
+func Divider(width int, legend string) string {
+	lw := lipgloss.Width(legend)
+	if legend == "" || lw+6 > width {
+		return Faint.Render(strings.Repeat("─", max(width, 0)))
+	}
+	return Faint.Render(strings.Repeat("─", width-lw-4)+" ") + legend + Faint.Render(" ──")
 }
 
 func pick[T any](cond bool, a, b T) T {

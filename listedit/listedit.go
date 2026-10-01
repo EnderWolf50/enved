@@ -335,7 +335,7 @@ func (m *Model) redraw() {
 	for row, i := range m.shown {
 		e := m.entries[i]
 		onCursor := row == cursor && m.focused
-		r := theme.NewRow(e.change(), onCursor)
+		r := theme.NewRow(e.change(), !e.removed && (problem[i] != "" || dupOf[i] > 0), onCursor)
 		plain := lipgloss.NewStyle()
 		value, state := r.Paint(plain, e.value), r.Paint(theme.OK, "ok")
 		switch {
@@ -619,7 +619,7 @@ func (m *Model) Body() string {
 	return strings.Join([]string{
 		filter,
 		body, "",
-		theme.Faint.Render(strings.Repeat("─", width)),
+		theme.Divider(width, theme.Legend(!m.ReadOnly, m.kind.noted())),
 		strings.Join(detail, "\n"),
 		ansi.Truncate(m.help.ShortHelpView(keys), width, "…"),
 	}, "\n")
