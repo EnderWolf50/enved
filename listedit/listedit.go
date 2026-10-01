@@ -68,6 +68,7 @@ var (
 	keyClean   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
 	keyUndo    = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
 	keyUndoAll = key.NewBinding(key.WithKeys("U"))
+	keyRedo    = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
 	keyOpen    = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
 	keyFilter  = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
 	keyReload  = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
@@ -96,7 +97,8 @@ type Model struct {
 	w, h    int        // the body's size
 	status  string     // a one-off note, cleared by the next key
 	history []Snapshot // the entries before each change, for u
-	edits   int        // how many changes were made, undos included
+	future  []Snapshot // the entries before each undo, for z
+	edits   int        // how many changes were made, undos and redos included
 }
 
 // Snapshot is the entries at one moment, for undo.
@@ -125,10 +127,24 @@ func (m *Model) Restore(s Snapshot) {
 // learn whether the key changed the list.
 func (m *Model) Edits() int { return m.edits }
 
-// remember keeps the entries as they are, before a change.
+// remember keeps the entries as they are, before a change; the change ends what z could
+// redo.
 func (m *Model) remember() {
-	m.history = append(m.history, m.Snapshot())
+	m.history, m.future = append(m.history, m.Snapshot()), nil
 	m.edits++
+}
+
+// step moves one state from one stack to the other: from history for undo, from future for
+// redo. It says whether there was one.
+func (m *Model) step(from, to *[]Snapshot) bool {
+	if len(*from) == 0 {
+		return false
+	}
+	last := (*from)[len(*from)-1]
+	*from, *to = (*from)[:len(*from)-1], append(*to, m.Snapshot())
+	m.edits++
+	m.Restore(last)
+	return true
 }
 
 // New is an editor for a list saved as saved and now current (the same, unless it was
@@ -147,7 +163,7 @@ func New(title string, kind Kind, saved, current []string, exists func(string) b
 // Reset starts over from a list saved as saved and now current. Entries of current found in
 // saved count as kept; saved ones current lacks are shown removed, near where they were.
 func (m *Model) Reset(saved, current []string) {
-	m.saved, m.entries, m.history = slices.Clone(saved), nil, nil
+	m.saved, m.entries, m.history, m.future = slices.Clone(saved), nil, nil, nil
 	unused := slices.Clone(saved)
 	for _, v := range current {
 		e := &entry{value: v}
@@ -398,26 +414,19 @@ func (m *Model) editable() bool {
 }
 
 // Undo takes back the last change; false when there is none.
-func (m *Model) Undo() bool {
-	if len(m.history) == 0 {
-		return false
-	}
-	last := m.history[len(m.history)-1]
-	m.history = m.history[:len(m.history)-1]
-	m.edits++
-	m.Restore(last)
-	return true
-}
+func (m *Model) Undo() bool { return m.step(&m.history, &m.future) }
 
-// UndoAll drops every change, as one step u can take back.
-func (m *Model) UndoAll() {
-	if m.Pending() == 0 {
-		return
+// Redo makes the last change undone again; false when there is none.
+func (m *Model) Redo() bool { return m.step(&m.future, &m.history) }
+
+// UndoAll takes back every change, one step at a time, so z redoes them in turn. It says
+// how many there were.
+func (m *Model) UndoAll() int {
+	n := 0
+	for m.Undo() {
+		n++
 	}
-	was, h := m.Snapshot(), m.history
-	m.Reset(m.saved, m.saved)
-	m.history = append(h, was)
-	m.edits++
+	return n
 }
 
 func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
@@ -484,8 +493,11 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 	case key.Matches(msg, keyUndoAll):
 		if m.editable() {
-			m.status = pick(m.Pending() > 0, "every change undone · u brings them back", "nothing to undo")
-			m.UndoAll()
+			m.status = pick(m.UndoAll() > 0, "every change undone · z redoes them one by one", "nothing to undo")
+		}
+	case key.Matches(msg, keyRedo):
+		if m.editable() {
+			m.status = pick(m.Redo(), "redone", "nothing to redo")
 		}
 	default:
 		var cmd tea.Cmd
@@ -605,7 +617,7 @@ func (m *Model) Body() string {
 	}
 
 	keys := append([]key.Binding{keyUp, keyDown, keyEdit, keyAppend, keyRemove, keyMoveUp, keySave, keyBack}, m.ExtraKeys...)
-	keys = append(keys, keyClean, keyUndo, keyFilter)
+	keys = append(keys, keyClean, keyUndo, keyRedo, keyFilter)
 	if m.kind.onDisk() {
 		keys = append(keys, keyOpen)
 	}

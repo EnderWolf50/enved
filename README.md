@@ -58,7 +58,8 @@ asks a second time.
 | `L` | mark it a list or text, which `enter` then follows (the `list` in the KIND column); it opens nothing |
 | `y` / `Y` | copy the value / the name |
 | `u` | undo the last change, here or in a list editor; again for the one before |
-| `U` | undo every change to this scope (`u` brings them back) |
+| `U` | undo every change to this scope |
+| `z` | redo what `u` or `U` undid, one change at a time; a new change ends what can be redone |
 | `/` | filter by name or value |
 | `R` | read the variables again |
 | `s` | review the changes, then save them |
@@ -72,7 +73,7 @@ asks a second time.
 | `K` / `J` | move the entry up / down |
 | `c` | mark every missing folder and duplicate for removal |
 | `o` | open the folder in Explorer |
-| `u` / `U` | undo the last change / every change to the variable |
+| `u` / `U` / `z` | undo the last change / every change, redo (one history with the table) |
 | `←` `h` `esc` `q` | back to the variables, keeping the changes marked |
 
 The details under the table show the expanded value, the registry type, and which variables

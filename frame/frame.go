@@ -260,9 +260,9 @@ func (m Model) viewMain() string {
 		case t.Dirty():
 			flag = "*"
 		}
-		// The panel's border and padding take 4 cells, the "▌ " mark 2, the name 8, the tag 4
+		// The panel's border and padding take 4 cells, the "▌ " mark 2, the name 9, the tag 4
 		// and the flag 2.
-		label := fmt.Sprintf("%-8s%-4s%*s %s", t.Name(), tag, max(sideW-20, 0), count, flag)
+		label := fmt.Sprintf("%-9s%-4s%*s %s", t.Name(), tag, max(sideW-21, 0), count, flag)
 		label = ansi.Truncate(label, max(sideW-6, 0), "")
 		if i == m.on {
 			side = append(side, theme.Accent.Render("▌ "+label))

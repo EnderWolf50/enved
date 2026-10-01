@@ -176,7 +176,7 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 			return tea.SetClipboard(v.Data), frame.None
 		}
 		return nil, frame.None
-	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyUndoAll):
+	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyUndoAll, keyRedo):
 		t.status = "this process's environment is read-only"
 		return nil, frame.None
 	}

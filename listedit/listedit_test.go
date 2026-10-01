@@ -23,13 +23,6 @@ func TestResetAlignsTextEdits(t *testing.T) {
 	if !slices.Equal(m.Result(), []string{"c", "a"}) || !m.Dirty() {
 		t.Fatalf("result %q", m.Result())
 	}
-	m.UndoAll()
-	if m.Dirty() {
-		t.Fatal("UndoAll left changes")
-	}
-	if !m.Undo() || !slices.Equal(m.Result(), []string{"c", "a"}) {
-		t.Fatalf("u after UndoAll did not bring the changes back: %q", m.Result())
-	}
 }
 
 func TestUndoOneStepAtATime(t *testing.T) {
@@ -58,6 +51,21 @@ func TestUndoOneStepAtATime(t *testing.T) {
 	press("u")
 	if m.Status() != "nothing to undo" {
 		t.Fatalf("status %q", m.Status())
+	}
+	// z redoes them in turn; U undoes them all again; a new change ends what z could redo.
+	for i := 1; i < len(steps); i++ {
+		press("z")
+		if want := steps[i]; !slices.Equal(m.Result(), want) {
+			t.Fatalf("redo %d: %q, want %q", i, m.Result(), want)
+		}
+	}
+	press("U")
+	if !slices.Equal(m.Result(), steps[0]) {
+		t.Fatalf("U: %q", m.Result())
+	}
+	press("z", "d", "z")
+	if m.Status() != "nothing to redo" {
+		t.Fatalf("z after a new change: status %q", m.Status())
 	}
 }
 

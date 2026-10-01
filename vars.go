@@ -77,6 +77,7 @@ var (
 	keyCopyName = key.NewBinding(key.WithKeys("Y"))
 	keyUndo     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
 	keyUndoAll  = key.NewBinding(key.WithKeys("U"))
+	keyRedo     = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
 	keyFilter   = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
 	keyReload   = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
 	keySave     = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
@@ -99,6 +100,7 @@ type varTab struct {
 	dialog  *varDialog
 	status  string
 	history [][]varState // the variables before each change, for u
+	future  [][]varState // the variables before each undo, for z
 }
 
 // varState is one variable at one moment, for undo: its fields, and its list's entries.
@@ -119,17 +121,18 @@ func (t *varTab) snapshot() []varState {
 	return out
 }
 
-// remember keeps the variables as they are, before a change.
-func (t *varTab) remember() { t.history = append(t.history, t.snapshot()) }
+// remember keeps the variables as they are, before a change; the change ends what z could
+// redo.
+func (t *varTab) remember() { t.history, t.future = append(t.history, t.snapshot()), nil }
 
-// undo takes back the last change, in the table or in a list editor.
-func (t *varTab) undo() {
-	if len(t.history) == 0 {
-		t.status = "nothing to undo"
-		return
+// step moves one state from one stack to the other: from history for undo, from future for
+// redo. It says whether there was one. One history covers the table and every list editor.
+func (t *varTab) step(from, to *[][]varState) bool {
+	if len(*from) == 0 {
+		return false
 	}
-	last := t.history[len(t.history)-1]
-	t.history = t.history[:len(t.history)-1]
+	last := (*from)[len(*from)-1]
+	*from, *to = (*from)[:len(*from)-1], append(*to, t.snapshot())
 	t.vars = make([]*variable, len(last))
 	for i, s := range last {
 		*s.v = s.was
@@ -138,11 +141,40 @@ func (t *varTab) undo() {
 		}
 		t.vars[i] = s.v
 	}
-	if t.open != nil && (t.open.list == nil || !slices.Contains(t.vars, t.open)) {
-		t.open = nil // the step undone came before the list editor was opened
+	switch {
+	case t.open == nil:
+	case t.open.list == nil || !slices.Contains(t.vars, t.open):
+		t.open = nil // the state came from before the list editor was opened
+	default:
+		t.open.list.Resize(t.w, t.h)
+		t.open.list.Focus(true)
 	}
-	t.status = "undone"
 	t.refresh()
+	return true
+}
+
+// history1 is u, U or z.
+func (t *varTab) history1(k tea.KeyPressMsg) {
+	switch {
+	case key.Matches(k, keyUndo):
+		t.undo()
+	case key.Matches(k, keyUndoAll):
+		t.undoAll()
+	default:
+		t.redo()
+	}
+}
+
+func (t *varTab) undo() { t.status = pick(t.step(&t.history, &t.future), "undone", "nothing to undo") }
+func (t *varTab) redo() { t.status = pick(t.step(&t.future, &t.history), "redone", "nothing to redo") }
+
+// undoAll takes back every change, one step at a time, so z redoes them in turn.
+func (t *varTab) undoAll() {
+	n := 0
+	for t.step(&t.history, &t.future) {
+		n++
+	}
+	t.status = pick(n > 0, "every change undone · z redoes them one by one", "nothing to undo")
 }
 
 func newVarTab(s winenv.Scope, st winenv.Store, prefs *listPrefs) *varTab {
@@ -171,7 +203,7 @@ func (t *varTab) Count() string {
 func (t *varTab) Load() {
 	t.saved, t.err = t.st.ReadAll(t.scope)
 	t.needsAdmin = !t.st.CanWrite(t.scope)
-	t.history = nil
+	t.history, t.future = nil, nil
 	t.reset()
 }
 
@@ -409,10 +441,11 @@ func (t *varTab) editable() bool {
 
 func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
-		// u in the list editor takes back the scope's last change, so one history covers
-		// the table and every list.
-		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo) && !t.open.list.Busy() {
-			t.undo()
+		// u, U and z in the list editor work on the scope's history, which covers the table
+		// and every list.
+		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo, keyUndoAll, keyRedo) && !t.open.list.Busy() {
+			t.status = ""
+			t.history1(k)
 			return nil, frame.None
 		}
 		list, edits, before := t.open.list, t.open.list.Edits(), t.snapshot()
@@ -525,16 +558,8 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if v != nil {
 			t.toggleList(v)
 		}
-	case key.Matches(msg, keyUndo):
-		t.undo()
-	case key.Matches(msg, keyUndoAll):
-		if !t.Dirty() {
-			t.status = "nothing to undo"
-			return nil, frame.None
-		}
-		t.remember()
-		t.reset()
-		t.status = "every change undone · u brings them back"
+	case key.Matches(msg, keyUndo, keyUndoAll, keyRedo):
+		t.history1(msg)
 	default:
 		var cmd tea.Cmd
 		t.table, cmd = t.table.Update(msg)
@@ -671,7 +696,7 @@ func (t *varTab) Body() string {
 		}
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
-	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keySave, keyBack, keyCopy, keyFilter, keyReload}
+	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo, keySave, keyBack, keyCopy, keyFilter, keyReload}
 	if t.filter.Focused() {
 		keys = []key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),

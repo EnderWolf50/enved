@@ -355,8 +355,7 @@ func TestTypeAndListToggles(t *testing.T) {
 	}
 }
 
-// u takes back one change at a time, the list editor's included; U drops them all, and u
-// brings them back.
+// u takes back one change at a time, the list editor's included; U all of them; z redoes.
 func TestUndoOneStepAtATime(t *testing.T) {
 	st, _ := fakeStore(map[string]string{"A": "1", "B": "2", "Path": `C:\a;C:\b`}, nil)
 	m := testModel(t, st)
@@ -387,14 +386,6 @@ func TestUndoOneStepAtATime(t *testing.T) {
 	if got := state(); got != want[0] {
 		t.Fatalf("before undo: %s", got)
 	}
-	m = press(m, "U")
-	if got := state(); got != want[3] {
-		t.Fatalf("U: %s", got)
-	}
-	m = press(m, "u")
-	if got := state(); got != want[0] {
-		t.Fatalf("u after U: %s", got)
-	}
 	m = cursorOn(t, m, "Path")
 	m = press(m, "enter", "u") // in the list editor
 	if got := state(); got != want[1] {
@@ -407,6 +398,21 @@ func TestUndoOneStepAtATime(t *testing.T) {
 	m = press(m, "u")
 	if vt.Status() != "nothing to undo" {
 		t.Fatalf("status %q", vt.Status())
+	}
+	// z redoes them in turn; U undoes them all, and z starts over from the first.
+	m = press(m, "z", "z", "z")
+	if got := state(); got != want[0] {
+		t.Fatalf("z, z, z: %s", got)
+	}
+	m = press(m, "U", "z")
+	if got := state(); got != want[2] {
+		t.Fatalf("U, z: %s", got)
+	}
+	// A new change ends what z could redo.
+	m = cursorOn(t, m, "B")
+	m = press(m, "x", "z")
+	if vt.Status() != "nothing to redo" {
+		t.Fatalf("z after a new change: status %q", vt.Status())
 	}
 }
 
