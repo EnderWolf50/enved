@@ -52,7 +52,7 @@ func get(k registry.Key, name string) (Value, bool, error) {
 }
 
 // Apply writes changes: every one is checked against the registry first, and none is
-// written if one fails the check. Each old value is saved to BackupDir before it goes, and
+// written if one fails the check. Each old value is saved to DataDir before it goes, and
 // running programs hear about the change once, at the end.
 func Apply(changes []Change) error {
 	changes = Ordered(changes)

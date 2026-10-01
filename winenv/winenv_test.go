@@ -35,23 +35,6 @@ func TestCheck(t *testing.T) {
 	}
 }
 
-func TestExpandWith(t *testing.T) {
-	vars := map[string]string{"A": "1", "HOME": `C:\h`}
-	lookup := func(n string) (string, bool) { v, ok := vars[n]; return v, ok }
-	for in, want := range map[string]string{
-		`%HOME%\bin`: `C:\h\bin`,
-		`%NOPE%\x`:   `%NOPE%\x`,
-		`5%%A%`:      `5%1`,
-		`%NOPE%A%`:   `%NOPE1`,
-		`100%`:       `100%`,
-		`%A%%A%`:     `11`,
-	} {
-		if got := ExpandWith(in, lookup); got != want {
-			t.Errorf("ExpandWith(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestSplitJoinSort(t *testing.T) {
 	if got := Split(` C:\a ;;C:\b;`); !slices.Equal(got, []string{`C:\a`, `C:\b`}) {
 		t.Errorf("Split = %q", got)

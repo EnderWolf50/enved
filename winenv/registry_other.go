@@ -4,8 +4,6 @@ package winenv
 
 import (
 	"errors"
-	"os"
-	"strings"
 )
 
 // Elsewhere there is no registry: the programs build, so their tests run, but reading or
@@ -17,15 +15,5 @@ func Apply([]Change) error         { return errNoRegistry }
 func CanWrite(Scope) bool          { return false }
 func Broadcast()                   {}
 
-// Expand expands %VARS% with this process's environment, names compared case-insensitively
-// as on Windows.
-func Expand(s string) string {
-	return ExpandWith(s, func(name string) (string, bool) {
-		for _, kv := range os.Environ() {
-			if k, v, _ := strings.Cut(kv, "="); strings.EqualFold(k, name) {
-				return v, true
-			}
-		}
-		return "", false
-	})
-}
+// Expand leaves s as it is: %VARS% are a Windows thing.
+func Expand(s string) string { return s }

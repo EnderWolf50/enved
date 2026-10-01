@@ -95,5 +95,5 @@ func (p *listPrefs) toggle(name string) error {
 
 // listsPath is where L's choices are kept.
 func listsPath() string {
-	return filepath.Join(winenv.BackupDir(), "lists.toml")
+	return filepath.Join(winenv.DataDir(), "lists.toml")
 }

@@ -22,13 +22,13 @@ func TestDividerFitsItsWidth(t *testing.T) {
 }
 
 func TestNoteTintsOnlyUnchangedRows(t *testing.T) {
-	if NewRow(Unchanged, Info, false).bg.GetBackground() != bgNote || NewRow(Unchanged, Problem, false).bg.GetBackground() != bgProblem {
+	if NewRow(Unchanged, Info, false).bg.GetBackground() != lipgloss.Color(current.RowNote) || NewRow(Unchanged, Problem, false).bg.GetBackground() != lipgloss.Color(current.RowProblem) {
 		t.Error("an unchanged row with a note does not have the note's tint")
 	}
-	if NewRow(Removed, Problem, false).bg.GetBackground() != bgRemoved {
+	if NewRow(Removed, Problem, false).bg.GetBackground() != lipgloss.Color(current.RowRemoved) {
 		t.Error("a change's tint does not win over the note's")
 	}
-	if NewRow(Unchanged, Info, true).bg.GetBackground() != bgNoteCursor {
+	if NewRow(Unchanged, Info, true).bg.GetBackground() != lipgloss.Color(current.RowNoteCursor) {
 		t.Error("the cursor on a noted row lacks the note's cursor tint")
 	}
 }

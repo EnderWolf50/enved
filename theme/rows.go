@@ -1,7 +1,6 @@
 package theme
 
 import (
-	"image/color"
 	"strings"
 
 	"charm.land/bubbles/v2/help"
@@ -46,17 +45,17 @@ func NewRow(c Change, note Note, cursor bool) Row {
 	var bg lipgloss.Style
 	switch {
 	case c == Removed:
-		bg = bg.Background(Pick(cursor, bgRemovedCursor, bgRemoved))
+		bg = bg.Background(lipgloss.Color(Pick(cursor, current.RowRemovedCursor, current.RowRemoved)))
 	case c == Added:
-		bg = bg.Background(Pick(cursor, bgAddedCursor, bgAdded))
+		bg = bg.Background(lipgloss.Color(Pick(cursor, current.RowAddedCursor, current.RowAdded)))
 	case c == Edited:
-		bg = bg.Background(Pick(cursor, bgEditedCursor, bgEdited))
+		bg = bg.Background(lipgloss.Color(Pick(cursor, current.RowEditedCursor, current.RowEdited)))
 	case note == Info:
-		bg = bg.Background(Pick(cursor, bgNoteCursor, bgNote))
+		bg = bg.Background(lipgloss.Color(Pick(cursor, current.RowNoteCursor, current.RowNote)))
 	case note == Problem:
-		bg = bg.Background(Pick(cursor, bgProblemCursor, bgProblem))
+		bg = bg.Background(lipgloss.Color(Pick(cursor, current.RowProblemCursor, current.RowProblem)))
 	case cursor:
-		bg = bg.Background(bgCursor)
+		bg = bg.Background(lipgloss.Color(current.RowCursor))
 	}
 	return Row{bg}
 }
@@ -91,18 +90,18 @@ func (r Row) Cells(cols []table.Column, cells ...string) table.Row {
 // changes adds added, edited and removed; info and problem name what those light tints
 // mark, if anything.
 func Legend(changes bool, info, problem string) string {
-	swatch := func(bg color.Color, what string) string {
-		return lipgloss.NewStyle().Background(bg).Render("  ") + Dim.Render(" "+what)
+	swatch := func(bg string, what string) string {
+		return lipgloss.NewStyle().Background(lipgloss.Color(bg)).Render("  ") + Dim.Render(" "+what)
 	}
 	var items []string
 	if changes {
-		items = append(items, swatch(bgAdded, "added"), swatch(bgEdited, "edited"), swatch(bgRemoved, "removed"))
+		items = append(items, swatch(current.RowAdded, "added"), swatch(current.RowEdited, "edited"), swatch(current.RowRemoved, "removed"))
 	}
 	if info != "" {
-		items = append(items, swatch(bgNote, info))
+		items = append(items, swatch(current.RowNote, info))
 	}
 	if problem != "" {
-		items = append(items, swatch(bgProblem, problem))
+		items = append(items, swatch(current.RowProblem, problem))
 	}
 	return strings.Join(items, "  ")
 }

@@ -153,39 +153,15 @@ func Split(v string) []string {
 // Join is the value a list of entries is stored as.
 func Join(entries []string) string { return strings.Join(entries, ";") }
 
-// ExpandWith replaces each %NAME% that lookup knows with its value, as Windows does: an
-// unknown one stays as it is.
-func ExpandWith(s string, lookup func(string) (string, bool)) string {
-	var b strings.Builder
-	for {
-		i := strings.IndexByte(s, '%')
-		if i < 0 {
-			break
-		}
-		j := strings.IndexByte(s[i+1:], '%')
-		if j < 0 {
-			break
-		}
-		name := s[i+1 : i+1+j]
-		if v, ok := lookup(name); ok && name != "" {
-			b.WriteString(s[:i] + v)
-			s = s[i+j+2:]
-		} else { // the closing % may open the next name
-			b.WriteString(s[:i+1+j])
-			s = s[i+1+j:]
-		}
-	}
-	return b.String() + s
-}
-
-// BackupDir is where the old values go: %LOCALAPPDATA%\enved.
-func BackupDir() string {
+// DataDir is where enved keeps its own files, %LOCALAPPDATA%\enved: the backups of old
+// values, and lists.toml (the L key's choices).
+func DataDir() string {
 	return filepath.Join(os.Getenv("LOCALAPPDATA"), "enved")
 }
 
 // ponytail: backups are never pruned; they are a few KB each.
 func backup(s Scope, name string, v Value) error {
-	dir := BackupDir()
+	dir := DataDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}

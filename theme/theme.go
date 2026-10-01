@@ -90,17 +90,12 @@ func validColor(s string) bool {
 	return err == nil && n >= 0 && n <= 255
 }
 
+// current is the theme in force; the rows take their backgrounds from it.
+var current Theme
+
 // The theme's colors and the styles made from them, set by Apply.
 var (
 	ColorAccent, ColorDim, ColorFaint, ColorOK, ColorBad, ColorWarn color.Color
-
-	// Row backgrounds, by change, each plain and under the cursor.
-	bgCursor                   color.Color
-	bgAdded, bgAddedCursor     color.Color
-	bgEdited, bgEditedCursor   color.Color
-	bgRemoved, bgRemovedCursor color.Color
-	bgNote, bgNoteCursor       color.Color
-	bgProblem, bgProblemCursor color.Color
 
 	Accent, OK, Err, Warn, Dim, Faint lipgloss.Style
 	Panel, Modal, Dialog              lipgloss.Style
@@ -125,17 +120,12 @@ func Apply(t Theme) {
 	c := lipgloss.Color
 	ColorAccent, ColorDim, ColorFaint = c(t.Accent), c(t.Dim), c(t.Faint)
 	ColorOK, ColorBad, ColorWarn = c(t.OK), c(t.Bad), c(t.Warn)
-	bgCursor = c(t.RowCursor)
-	bgAdded, bgAddedCursor = c(t.RowAdded), c(t.RowAddedCursor)
-	bgEdited, bgEditedCursor = c(t.RowEdited), c(t.RowEditedCursor)
-	bgRemoved, bgRemovedCursor = c(t.RowRemoved), c(t.RowRemovedCursor)
-	bgNote, bgNoteCursor = c(t.RowNote), c(t.RowNoteCursor)
-	bgProblem, bgProblemCursor = c(t.RowProblem), c(t.RowProblemCursor)
+	current = t
 
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 	Accent = fg(ColorAccent).Bold(true)
 	OK, Err, Warn, Dim, Faint = fg(ColorOK), fg(ColorBad), fg(ColorWarn), fg(ColorDim), fg(ColorFaint)
-	Badge = fg(ColorDim).Background(bgCursor).Padding(0, 1)
+	Badge = fg(ColorDim).Background(c(t.RowCursor)).Padding(0, 1)
 	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	Panel = border.BorderForeground(ColorFaint).Padding(0, 1)
 	Modal = border.BorderForeground(ColorBad).Padding(1, 3)     // the quit question
