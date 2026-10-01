@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -531,16 +531,16 @@ func TestCLI(t *testing.T) {
 }
 
 func TestShellInit(t *testing.T) {
-	for _, shell := range []string{"pwsh", "PowerShell"} {
-		if got, err := shellInit(shell); err != nil || got != pwshInit {
-			t.Errorf("shellInit(%q) = %q, %v; want the pwsh wrapper", shell, got, err)
+	for _, prog := range []string{"enved", "pathed"} {
+		for _, shell := range []string{"pwsh", "PowerShell"} {
+			got, err := shellInit(prog, shell)
+			if err != nil || !strings.Contains(got, "function "+prog+" {") || !strings.Contains(got, prog+".exe @args") || strings.Contains(got, "__PROG__") {
+				t.Errorf("shellInit(%q, %q) = %q, %v; want %s's wrapper", prog, shell, got, err, prog)
+			}
 		}
 	}
-	if _, err := shellInit("bash"); err == nil {
+	if _, err := shellInit("enved", "bash"); err == nil {
 		t.Error("shellInit(bash) did not fail")
-	}
-	if !strings.Contains(pwshInit, "function enved {") {
-		t.Error("the pwsh wrapper does not define enved")
 	}
 }
 

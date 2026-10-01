@@ -1,7 +1,6 @@
 // Package listedit is the editor for a list value such as PATH: one entry per row, changes
 // marked until they are saved (added green, edited amber, removed red and struck through),
-// entries checked as they are shown and typed, and moved with K and J. pathed shows one per
-// PATH; enved opens one in place for any list variable.
+// entries checked as they are shown and typed, and moved with K and J. enved opens one in place for any list variable.
 package listedit
 
 import (

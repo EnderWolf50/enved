@@ -1,4 +1,4 @@
-// Package theme is the look shared by enved and pathed: the settings file's [theme], the
+// Package theme is enved's look: the settings file's [theme], the
 // colors and styles made from it, and the helpers that paint table rows with them.
 package theme
 

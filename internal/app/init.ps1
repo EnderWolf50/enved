@@ -1,10 +1,10 @@
-# enved's PowerShell wrapper, printed by `enved init pwsh`.
-# enved.exe changes the saved variables, but a child process cannot touch this shell's
+# __PROG__'s PowerShell wrapper, printed by `__PROG__ init pwsh`.
+# __PROG__.exe changes the saved variables, but a child process cannot touch this shell's
 # environment. This compares the saved variables before and after and applies the
 # difference here: a changed variable gets its new value, a removed one goes. Path is
 # merged instead, so entries only this session has (mise's, a venv's, ...) stay: added
 # entries go to the end, removed ones are dropped.
-function enved {
+function __PROG__ {
   # The saved variables as a new process gets them: Machine, then User over it, expanded.
   $saved = {
     $vars = @{}
@@ -19,7 +19,7 @@ function enved {
   }
 
   $before = & $saved
-  enved.exe @args
+  __PROG__.exe @args
   $after = & $saved
 
   foreach ($name in @($before.Keys) + @($after.Keys) | Sort-Object -Unique) {

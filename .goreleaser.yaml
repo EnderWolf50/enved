@@ -1,15 +1,38 @@
 version: 2
 
+# Two programs from one module: enved, and pathed (enved path as a command of its own).
 builds:
-  - env:
+  - id: enved
+    binary: enved
+    main: .
+    env:
       - CGO_ENABLED=0
     goos: [windows]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X github.com/EnderWolf50/enved/internal/app.version={{ .Version }}
+  - id: pathed
+    binary: pathed
+    main: ./cmd/pathed
+    env:
+      - CGO_ENABLED=0
+    goos: [windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/EnderWolf50/enved/internal/app.version={{ .Version }}
 
 archives:
-  - formats: [zip]
+  - id: enved
+    ids: [enved]
+    name_template: "enved_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+  - id: pathed
+    ids: [pathed]
+    name_template: "pathed_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [zip]
     files:
       - README.md
       - LICENSE

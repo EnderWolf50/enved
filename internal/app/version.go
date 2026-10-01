@@ -1,8 +1,8 @@
-package main
+package app
 
 import "runtime/debug"
 
-// version is set by release builds (-X main.version=...); a `go install` build reads it from
+// version is set by release builds (-X github.com/EnderWolf50/enved/internal/app.version=...); a `go install` build reads it from
 // the module instead.
 var version = "dev"
 

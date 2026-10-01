@@ -1,4 +1,4 @@
-// Package frame is the screen enved and pathed share: a sidebar of tabs and a panel with
+// Package frame is enved's screen: a sidebar of tabs and a panel with
 // the selected tab's content; a review of every change before saving; the save itself, off
 // the UI loop because UAC may be asking; and a quit dialog that only asks about unsaved
 // changes. A tab supplies its content and its changes; the frame does the rest.

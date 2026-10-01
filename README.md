@@ -1,8 +1,12 @@
 # enved
 
 View and edit the persistent Windows environment variables, User and Machine, from a TUI or
-the command line. A sibling of [bump](https://github.com/EnderWolf50/bump) and
-[pathed](https://github.com/EnderWolf50/pathed), with the same keys, theme and settings.
+the command line. A sibling of [bump](https://github.com/EnderWolf50/bump), with the same
+look and settings.
+
+This repository also builds **pathed**, the PATH on its own (formerly
+[its own repository](https://github.com/EnderWolf50/pathed)): `pathed` is `enved path` as a
+command of its own, with the same editor, settings and shell wrapper.
 
 It writes the registry directly, so `REG_EXPAND_SZ` values and their `%VARS%` stay intact
 (.NET's `SetEnvironmentVariable` rewrites them as `REG_SZ`). Every write first saves the old
@@ -11,16 +15,18 @@ enved read it, and tells running programs the environment changed, so new window
 without signing out.
 
 List values (`Path`, `PATHEXT`, `PSModulePath`, `INCLUDE`, `LIB`, `LIBPATH`, `CLASSPATH`, and
-any you choose) open in pathed's list editor, in place: entries checked as you type,
-duplicates and missing folders marked, reordered with `K`/`J`.
+any you choose) open in a list editor, in place: entries checked as you type, duplicates
+and missing folders marked, reordered with `K`/`J`.
 
 ## Install
 
-Download `enved.exe` from the [latest release](https://github.com/EnderWolf50/enved/releases/latest)
-and put it on your `PATH`, or build it with Go 1.27+:
+Download `enved.exe` (and `pathed.exe`, if you want it) from the
+[latest release](https://github.com/EnderWolf50/enved/releases/latest) and put them on your
+`PATH`, or build them with Go 1.27+:
 
 ```sh
 go install github.com/EnderWolf50/enved@latest
+go install github.com/EnderWolf50/enved/cmd/pathed@latest
 ```
 
 ## Use
@@ -33,6 +39,14 @@ enved set NAME VALUE [-m] [--expand | --no-expand]
 enved unset NAME [-m] [--force]
 enved edit NAME [-m]           the editor, opened on that variable
 enved init pwsh                print a wrapper that also updates the current shell
+
+enved path [-m]                the PATH editor: the User and Machine PATHs, nothing else
+enved path list [-m]           Path's entries, numbered; missing folders and duplicates marked
+enved path add <dir> [-m] [--front]
+enved path rm <dir|N> [-m]     N is the number shown by 'enved path list'
+enved path clean [-m]          drop duplicates and folders that do not exist
+
+pathed ...                     the same as enved path ...; pathed init pwsh is its wrapper
 ```
 
 `-m` works on the Machine variables. Writing them needs admin: unless enved already runs
@@ -47,8 +61,9 @@ are only marked until you save: added variables show green, edited ones amber, r
 red and struck through. An unchanged row worth a look gets a light tint: blue-gray for a
 fact to keep in mind (a system variable; in Process, a stale value), violet for a problem
 (in a list, a missing folder, a bad extension or a duplicate). The divider under the table
-carries the key to these colors. The keys under it come in groups of related ones; `s` shows every change, and removing or emptying a system variable
-asks a second time.
+carries the key to these colors, and the keys under it come in groups of related ones. `s`
+shows every change (a list's added, removed, edited and moved entries one by one), and
+removing or emptying a system variable asks a second time.
 
 | Key | In the variables |
 | --- | --- |
@@ -92,16 +107,18 @@ prints a commented starting point. `L` keeps its choices in `%LOCALAPPDATA%\enve
 enved changes the saved variables, but the shell it runs in keeps its own copy, which a
 program the shell starts cannot change. `enved init pwsh` prints a PowerShell function named
 `enved` that runs `enved.exe` and then applies the change to the shell as well: changed
-variables get their new value, removed ones go, and `Path` is merged the way pathed's wrapper
-does (added entries go to the end, entries only this session has stay). In your `$PROFILE`:
+variables get their new value, removed ones go, and `Path` is merged (added entries go to the
+end, removed ones are dropped, entries only this session has, from mise or a venv, stay). It
+`pathed init pwsh` prints the same for `pathed`. In your `$PROFILE`:
 
 ```powershell
 enved.exe init pwsh | Out-String | Invoke-Expression
+pathed.exe init pwsh | Out-String | Invoke-Expression
 ```
 
 ## Packages
 
-pathed and enved share their code through this module:
+enved and pathed are built from these packages:
 
 | Package | What |
 | --- | --- |
@@ -110,6 +127,7 @@ pathed and enved share their code through this module:
 | `listedit` | the list editor, as a Bubble Tea component |
 | `frame` | sidebar, panel, review, save and quit dialog around a program's tabs |
 | `theme` | the settings file's `[theme]`, the styles, painted table rows |
+| `internal/app` | the two programs: their commands, tabs and dialogs |
 
 ## License
 

@@ -1,4 +1,4 @@
-package main
+package app
 
 // Which variables are edited as lists: the ones listedit knows by name, unless the settings
 // or the L key said otherwise. L's choices are kept in %LOCALAPPDATA%\enved\lists.toml, not
