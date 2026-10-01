@@ -144,6 +144,7 @@ var (
 
 	Accent, OK, Err, Warn, Dim, Faint lipgloss.Style
 	Panel, Modal, Dialog              lipgloss.Style
+	Badge                             lipgloss.Style // a short tag on a tinted ground: uac, ro
 )
 
 // onlyTheme is a settings file with nothing but a [theme].
@@ -172,6 +173,7 @@ func Apply(t Theme) {
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 	Accent = fg(ColorAccent).Bold(true)
 	OK, Err, Warn, Dim, Faint = fg(ColorOK), fg(ColorBad), fg(ColorWarn), fg(ColorDim), fg(ColorFaint)
+	Badge = fg(ColorDim).Background(bgCursor).Padding(0, 1)
 	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	Panel = border.BorderForeground(ColorFaint).Padding(0, 1)
 	Modal = border.BorderForeground(ColorBad).Padding(1, 3)     // the quit question

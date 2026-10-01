@@ -203,7 +203,7 @@ func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // reload reads the selected tab again, unless it has changes that would be lost.
 func (m Model) reload() (tea.Model, tea.Cmd) {
 	if m.tab().Dirty() {
-		m.status = "unsaved changes: U undoes them first"
+		m.status = "unsaved changes: save them, or undo them with u, first"
 		return m, nil
 	}
 	m.tab().Load()
@@ -244,31 +244,32 @@ func (m Model) viewMain() string {
 	sideW := m.opts.SidebarWidth
 	var side []string
 	for i, t := range m.tabs {
-		// Fixed columns, so the counts line up: name, tag (uac, ro), count, flag (! or *).
-		tag, count, flag := "", t.Count(), " "
+		// The name and a uac/ro badge on the left; the count and a flag (! or *) in fixed
+		// columns on the right, so the counts line up.
+		style, mark := theme.Dim, "  "
+		if i == m.on {
+			style, mark = theme.Accent, "▌ "
+		}
+		left := style.Render(mark + t.Name())
 		switch {
 		case t.ReadOnly():
-			tag = "ro"
+			left += " " + theme.Badge.Render("ro")
 		case t.NeedsAdmin():
-			tag = "uac"
+			left += " " + theme.Badge.Render("uac")
 		}
+		count, flag := t.Count(), " "
 		switch {
 		case t.Err() != nil:
 			count, flag = "", theme.Err.Render("!")
 		case m.saveErr[i] != nil:
 			flag = theme.Err.Render("!")
 		case t.Dirty():
-			flag = "*"
+			flag = style.Render("*")
 		}
-		// The panel's border and padding take 4 cells, the "▌ " mark 2, the name 9, the tag 4
-		// and the flag 2.
-		label := fmt.Sprintf("%-9s%-4s%*s %s", t.Name(), tag, max(sideW-21, 0), count, flag)
-		label = ansi.Truncate(label, max(sideW-6, 0), "")
-		if i == m.on {
-			side = append(side, theme.Accent.Render("▌ "+label))
-		} else {
-			side = append(side, theme.Dim.Render("  "+label))
-		}
+		// The panel's border and padding take 4 cells; the count 3, a space and the flag 2.
+		inner := max(sideW-4, 0)
+		row := lipgloss.PlaceHorizontal(max(inner-5, 0), lipgloss.Left, left) + style.Render(fmt.Sprintf("%3s ", count)) + flag
+		side = append(side, ansi.Truncate(row, inner, ""))
 	}
 
 	focused := theme.Panel.BorderForeground(theme.ColorAccent)

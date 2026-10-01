@@ -52,18 +52,14 @@ func TestUndoOneStepAtATime(t *testing.T) {
 	if m.Status() != "nothing to undo" {
 		t.Fatalf("status %q", m.Status())
 	}
-	// z redoes them in turn; U undoes them all again; a new change ends what z could redo.
+	// z redoes them in turn; a new change ends what z could redo.
 	for i := 1; i < len(steps); i++ {
 		press("z")
 		if want := steps[i]; !slices.Equal(m.Result(), want) {
 			t.Fatalf("redo %d: %q, want %q", i, m.Result(), want)
 		}
 	}
-	press("U")
-	if !slices.Equal(m.Result(), steps[0]) {
-		t.Fatalf("U: %q", m.Result())
-	}
-	press("z", "d", "z")
+	press("d", "z")
 	if m.Status() != "nothing to redo" {
 		t.Fatalf("z after a new change: status %q", m.Status())
 	}

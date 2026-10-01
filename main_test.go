@@ -399,17 +399,13 @@ func TestUndoOneStepAtATime(t *testing.T) {
 	if vt.Status() != "nothing to undo" {
 		t.Fatalf("status %q", vt.Status())
 	}
-	// z redoes them in turn; U undoes them all, and z starts over from the first.
+	// z redoes them in turn.
 	m = press(m, "z", "z", "z")
 	if got := state(); got != want[0] {
 		t.Fatalf("z, z, z: %s", got)
 	}
-	m = press(m, "U", "z")
-	if got := state(); got != want[2] {
-		t.Fatalf("U, z: %s", got)
-	}
 	// A new change ends what z could redo.
-	m = cursorOn(t, m, "B")
+	m = cursorOn(t, m, "Path")
 	m = press(m, "x", "z")
 	if vt.Status() != "nothing to redo" {
 		t.Fatalf("z after a new change: status %q", vt.Status())
@@ -419,7 +415,7 @@ func TestUndoOneStepAtATime(t *testing.T) {
 func TestCopyNameAndValue(t *testing.T) {
 	st, _ := fakeStore(map[string]string{"A": "1"}, nil)
 	m := testModel(t, st)
-	for k, want := range map[string]string{"y": "1", "Y": "A"} {
+	for k, want := range map[string]string{"v": "1", "n": "A"} {
 		next, cmd := press(m, "enter").Update(tea.KeyPressMsg{Code: rune(k[0]), Text: k})
 		m = next.(frame.Model)
 		if cmd == nil || !strings.Contains(fmt.Sprint(cmd()), want) {

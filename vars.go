@@ -73,10 +73,9 @@ var (
 	keyRemove   = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
 	keyType     = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "%expand"))
 	keyList     = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "list on/off"))
-	keyCopy     = key.NewBinding(key.WithKeys("y"), key.WithHelp("y/Y", "copy value/name"))
-	keyCopyName = key.NewBinding(key.WithKeys("Y"))
-	keyUndo     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
-	keyUndoAll  = key.NewBinding(key.WithKeys("U"))
+	keyCopy     = key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "copy value"))
+	keyCopyName = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "copy name"))
+	keyUndo     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo"))
 	keyRedo     = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
 	keyFilter   = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
 	keyReload   = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
@@ -153,13 +152,11 @@ func (t *varTab) step(from, to *[][]varState) bool {
 	return true
 }
 
-// history1 is u, U or z.
+// history1 is u or z.
 func (t *varTab) history1(k tea.KeyPressMsg) {
 	switch {
 	case key.Matches(k, keyUndo):
 		t.undo()
-	case key.Matches(k, keyUndoAll):
-		t.undoAll()
 	default:
 		t.redo()
 	}
@@ -167,15 +164,6 @@ func (t *varTab) history1(k tea.KeyPressMsg) {
 
 func (t *varTab) undo() { t.status = pick(t.step(&t.history, &t.future), "undone", "nothing to undo") }
 func (t *varTab) redo() { t.status = pick(t.step(&t.future, &t.history), "redone", "nothing to redo") }
-
-// undoAll takes back every change, one step at a time, so z redoes them in turn.
-func (t *varTab) undoAll() {
-	n := 0
-	for t.step(&t.history, &t.future) {
-		n++
-	}
-	t.status = pick(n > 0, "every change undone · z redoes them one by one", "nothing to undo")
-}
 
 func newVarTab(s winenv.Scope, st winenv.Store, prefs *listPrefs) *varTab {
 	t := &varTab{scope: s, st: st, prefs: prefs, grid: newGrid()}
@@ -443,7 +431,7 @@ func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
 		// u, U and z in the list editor work on the scope's history, which covers the table
 		// and every list.
-		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo, keyUndoAll, keyRedo) && !t.open.list.Busy() {
+		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo, keyRedo) && !t.open.list.Busy() {
 			t.status = ""
 			t.history1(k)
 			return nil, frame.None
@@ -558,7 +546,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if v != nil {
 			t.toggleList(v)
 		}
-	case key.Matches(msg, keyUndo, keyUndoAll, keyRedo):
+	case key.Matches(msg, keyUndo, keyRedo):
 		t.history1(msg)
 	default:
 		var cmd tea.Cmd
@@ -696,7 +684,7 @@ func (t *varTab) Body() string {
 		}
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
-	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo, keySave, keyBack, keyCopy, keyFilter, keyReload}
+	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo, keySave, keyBack, keyCopy, keyCopyName, keyFilter, keyReload}
 	if t.filter.Focused() {
 		keys = []key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),

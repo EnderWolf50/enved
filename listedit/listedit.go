@@ -57,23 +57,22 @@ func (e *entry) change() theme.Change {
 }
 
 var (
-	keyUp      = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	keyDown    = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
-	keyMoveUp  = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
-	keyMoveDn  = key.NewBinding(key.WithKeys("J", "shift+down"))
-	keyAppend  = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
-	keyInsert  = key.NewBinding(key.WithKeys("i"))
-	keyEdit    = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
-	keyRemove  = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
-	keyClean   = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
-	keyUndo    = key.NewBinding(key.WithKeys("u"), key.WithHelp("u/U", "undo/all"))
-	keyUndoAll = key.NewBinding(key.WithKeys("U"))
-	keyRedo    = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
-	keyOpen    = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
-	keyFilter  = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	keyReload  = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
-	keySave    = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
-	keyBack    = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
+	keyUp     = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
+	keyDown   = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
+	keyMoveUp = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
+	keyMoveDn = key.NewBinding(key.WithKeys("J", "shift+down"))
+	keyAppend = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
+	keyInsert = key.NewBinding(key.WithKeys("i"))
+	keyEdit   = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
+	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
+	keyClean  = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
+	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo"))
+	keyRedo   = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
+	keyOpen   = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
+	keyFilter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
+	keyReload = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
+	keySave   = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
+	keyBack   = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
 // Model is one list being edited.
@@ -419,16 +418,6 @@ func (m *Model) Undo() bool { return m.step(&m.history, &m.future) }
 // Redo makes the last change undone again; false when there is none.
 func (m *Model) Redo() bool { return m.step(&m.future, &m.history) }
 
-// UndoAll takes back every change, one step at a time, so z redoes them in turn. It says
-// how many there were.
-func (m *Model) UndoAll() int {
-	n := 0
-	for m.Undo() {
-		n++
-	}
-	return n
-}
-
 func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 	e, i, ok := m.current()
 	switch {
@@ -490,10 +479,6 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 	case key.Matches(msg, keyUndo):
 		if m.editable() {
 			m.status = pick(m.Undo(), "undone", "nothing to undo")
-		}
-	case key.Matches(msg, keyUndoAll):
-		if m.editable() {
-			m.status = pick(m.UndoAll() > 0, "every change undone · z redoes them one by one", "nothing to undo")
 		}
 	case key.Matches(msg, keyRedo):
 		if m.editable() {

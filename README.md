@@ -41,8 +41,8 @@ variable's type; a new one is `REG_EXPAND_SZ` when its value holds a `%`. Removi
 Windows relies on (`SystemRoot`, `ComSpec`, `TEMP`, `Path`, ...) needs `--force`.
 
 In the editor the sidebar holds User, Machine and Process, each with its number of variables
-(`uac` saving asks for admin, `ro` read-only; `*` unsaved changes, `!` could not be read or
-saved); `enter` opens one. Changes
+(a `uac` badge: saving asks for admin; `ro`: read-only; `*` unsaved changes, `!` could not
+be read or saved); `enter` opens one. Changes
 are only marked until you save: added variables show green, edited ones amber, removed ones
 red and struck through; `s` shows every change, and removing or emptying a system variable
 asks a second time.
@@ -56,10 +56,10 @@ asks a second time.
 | `d` | remove, or keep again |
 | `x` | switch how it is saved: `REG_SZ` (as it is) or `REG_EXPAND_SZ` (`%VARS%` expanded when read) |
 | `L` | mark it a list or text, which `enter` then follows (the `list` in the KIND column); it opens nothing |
-| `y` / `Y` | copy the value / the name |
+| `v` | copy the value |
+| `n` | copy the name |
 | `u` | undo the last change, here or in a list editor; again for the one before |
-| `U` | undo every change to this scope |
-| `z` | redo what `u` or `U` undid, one change at a time; a new change ends what can be redone |
+| `z` | redo what `u` undid, one change at a time; a new change ends what can be redone |
 | `/` | filter by name or value |
 | `R` | read the variables again |
 | `s` | review the changes, then save them |
@@ -73,7 +73,7 @@ asks a second time.
 | `K` / `J` | move the entry up / down |
 | `c` | mark every missing folder and duplicate for removal |
 | `o` | open the folder in Explorer |
-| `u` / `U` / `z` | undo the last change / every change, redo (one history with the table) |
+| `u` / `z` | undo the last change / redo it (one history with the table) |
 | `←` `h` `esc` `q` | back to the variables, keeping the changes marked |
 
 The details under the table show the expanded value, the registry type, and which variables
@@ -82,7 +82,7 @@ use this one (`%JAVA_HOME%` in `Path`); the review warns before removing one sti
 **Process** is the environment enved started with, read-only. A value that differs from
 what the saved variables give now is marked `stale`: that shell has an old copy.
 
-Settings (theme colors, sidebar width, which variables are lists) live in
+Settings (theme colors, `sidebar_width` (30 by default), which variables are lists) live in
 `~/.config/enved/config.toml`, or the file named by `$ENVED_CONFIG`; `enved --default-config`
 prints a commented starting point. `L` keeps its choices in `%LOCALAPPDATA%\enved\lists.toml`.
 

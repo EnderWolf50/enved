@@ -130,12 +130,12 @@ it.
 - **Keys** in the table: `a` add, `enter` edit (a list in the list editor), `e` edit as
   text, `d` remove or keep again, `r` rename (a remove plus an add, shown as one change), `x`
   switch `REG_SZ`/`REG_EXPAND_SZ`, `L` mark a list or text (it only sets what `enter` opens,
-  as `x` only sets the type), `y`/`Y` copy the value/name, `u` undo the last change, `U`
-  every change, `z` redo, `/`, `R` reload, `s` save. In the list editor, `a` and `i` add after and
+  as `x` only sets the type), `v`/`n` copy the value/name, `u` undo the last change, `z`
+  redo, `/`, `R` reload, `s` save. In the list editor, `a` and `i` add after and
   before the cursor; `x` does nothing there, so it never means two things.
 - **Undo** is one history per scope, the list editors' changes included: `u` takes back
-  the last change wherever it was made, `U` all of them, and `z` redoes them one at a time
-  until a new change is made.
+  the last change wherever it was made, and `z` redoes them one at a time until a new change
+  is made.
 - A value typed with a `%` in it becomes `REG_EXPAND_SZ` unless the user switched it with
   `x`; the review shows every type change.
 - Names are checked as they are typed: not empty, no `=`, not already in this scope

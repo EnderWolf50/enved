@@ -176,7 +176,7 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 			return tea.SetClipboard(v.Data), frame.None
 		}
 		return nil, frame.None
-	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyUndoAll, keyRedo):
+	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo):
 		t.status = "this process's environment is read-only"
 		return nil, frame.None
 	}
@@ -219,7 +219,7 @@ func (t *processTab) Body() string {
 	for i := range detail {
 		detail[i] = ansi.Truncate(detail[i], width, "…")
 	}
-	keys := []key.Binding{keyUp, keyDown, keyFilter, keyCopy, keyReload, keyBack}
+	keys := []key.Binding{keyUp, keyDown, keyFilter, keyCopy, keyCopyName, keyReload, keyBack}
 	return strings.Join([]string{
 		t.filterLine(),
 		t.table.View(), "",

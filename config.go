@@ -12,7 +12,7 @@ const defaultConfig = `# enved's settings. Every key is optional: one left out k
 # Colors are "#rrggbb" or an ANSI color number, "0" to "255".
 
 # Width of the sidebar, in cells.
-sidebar_width = 24
+sidebar_width = 30
 
 # Variables to edit as lists (entries split at ;) or as text, whatever enved would guess.
 # It guesses lists for Path, PATHEXT, PSModulePath, INCLUDE, LIB, LIBPATH and CLASSPATH.
@@ -30,8 +30,8 @@ type config struct {
 }
 
 func checkConfig(c config) error {
-	if c.SidebarWidth < 16 {
-		return errors.New("sidebar_width must be at least 16")
+	if c.SidebarWidth < 20 {
+		return errors.New("sidebar_width must be at least 20")
 	}
 	return c.Theme.Check()
 }
