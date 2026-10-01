@@ -314,16 +314,31 @@ func TestTypeAndListToggles(t *testing.T) {
 	if vars(m).open != nil || vars(m).dialog == nil {
 		t.Fatal("DIRS opened as a list before L said so")
 	}
-	m = press(m, "esc", "L", "enter")
+	// L opens it as a list right away, and enter does from then on.
+	m = press(m, "esc", "L")
 	if vars(m).open == nil {
-		t.Fatal("L did not make DIRS a list")
+		t.Fatal("L did not open DIRS as a list")
 	}
 	prefs := vars(m).prefs
 	again, _ := loadLists(cfg, prefs.path)
 	if _, isList := again.kind("dirs"); !isList {
 		t.Fatal("the choice was not kept")
 	}
+	m = press(m, "a")
+	m = typeText(m, `C:\c`)
+	m = press(m, "enter", "esc", "enter")
+	if vars(m).open == nil || vars(m).open.list.Pending() != 1 {
+		t.Fatal("enter did not open DIRS as a list again, with its change")
+	}
+	// L in the list editor: back to text, in the dialog, with the entries' changes kept.
+	m = press(m, "L")
+	if vars(m).open != nil || vars(m).dialog == nil || vars(m).dialog.value.Value() != `C:\a;C:\c;C:\b` {
+		t.Fatalf("L in the list editor did not switch to text: %+v", vars(m).dialog)
+	}
 	m = press(m, "esc")
+	if _, isList := prefs.kind("DIRS"); isList {
+		t.Fatal("DIRS is still a list")
+	}
 
 	// x switches the type; after it, the % in the value does not switch it back.
 	m = cursorOn(t, m, "PCT")

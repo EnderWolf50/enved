@@ -97,3 +97,40 @@ func TestNormalize(t *testing.T) {
 		t.Errorf("text normalize = %q", got)
 	}
 }
+
+func TestAppendAndInsert(t *testing.T) {
+	keys := func(m *Model, ks ...string) {
+		for _, k := range ks {
+			switch k {
+			case "enter":
+				m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			default:
+				for _, r := range k {
+					m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+				}
+			}
+		}
+	}
+	m := New("t", Text, []string{"b", "d"}, []string{"b", "d"}, nil)
+	m.Resize(80, 20)
+	m.Focus(true)
+	keys(m, "i", "a", "enter")      // before b, the cursor's
+	keys(m, "j", "a", "c", "enter") // the cursor is on the new a; j moves to b, a appends after it
+	m.table.SetCursor(len(m.entries) - 1)
+	keys(m, "a", "e", "enter") // after d, the last
+	if want := []string{"a", "b", "c", "d", "e"}; !slices.Equal(m.Result(), want) {
+		t.Fatalf("result %q, want %q", m.Result(), want)
+	}
+	// x is not remove in the list editor.
+	keys(m, "x")
+	if len(m.Result()) != 5 {
+		t.Fatal("x removed an entry")
+	}
+	// i on an empty list adds the first entry.
+	e := New("t", Text, nil, nil, nil)
+	e.Resize(80, 20)
+	keys(e, "i", "only", "enter")
+	if !slices.Equal(e.Result(), []string{"only"}) {
+		t.Fatalf("empty list: %q", e.Result())
+	}
+}

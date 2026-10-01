@@ -49,17 +49,28 @@ asks a second time.
 | Key | In the variables |
 | --- | --- |
 | `enter`, `e` | edit the value; a list opens in the list editor |
-| `a` | add a variable (name, then value) |
+| `a` | add a variable (name, then value); the table stays sorted by name, as Windows keeps no order |
 | `n` | rename |
 | `d` | remove, or keep again |
-| `x` | switch between `REG_SZ` and `REG_EXPAND_SZ` |
-| `L` | edit this variable as a list, or as text (remembered) |
+| `x` | switch how it is saved: `REG_SZ` (as it is) or `REG_EXPAND_SZ` (`%VARS%` expanded when read) |
+| `L` | edit it in the other form, list or text, now and from then on |
 | `y` | copy the value |
 | `u` | undo every change to this scope |
 | `/` | filter by name or value |
 | `r` | read the variables again |
 | `s` | review the changes, then save them |
 | `←` `h` `esc` `q` | back (out of the list editor, then to the sidebar) |
+
+| Key | In the list editor |
+| --- | --- |
+| `enter`, `e` | edit the entry |
+| `a` / `i` | add an entry after / before the cursor |
+| `d` | remove the entry, or keep it again |
+| `K` / `J` | move the entry up / down |
+| `c` | mark every missing folder and duplicate for removal |
+| `o` | open the folder in Explorer |
+| `L` | edit the variable as text instead |
+| `←` `h` `esc` `q` | back to the variables, keeping the changes marked |
 
 The details under the table show the expanded value, the registry type, and which variables
 use this one (`%JAVA_HOME%` in `Path`); the review warns before removing one still in use.

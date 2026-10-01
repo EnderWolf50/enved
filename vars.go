@@ -71,7 +71,7 @@ var (
 	keyRename = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "rename"))
 	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
 	keyType   = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "%expand"))
-	keyList   = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "list/text"))
+	keyList   = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "edit as list/text"))
 	keyCopy   = key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy"))
 	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo all"))
 	keyFilter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
@@ -360,6 +360,12 @@ func (t *varTab) editable() bool {
 
 func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
+		// L in the list editor: this variable is text after all.
+		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyList) && !t.open.list.Busy() {
+			v := t.open
+			t.closeList()
+			return t.switchForm(v), frame.None
+		}
 		cmd, ev := t.open.list.Update(msg)
 		if ev == listedit.Back {
 			t.closeList()
@@ -456,17 +462,12 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 			t.redraw()
 		}
 	case key.Matches(msg, keyList):
-		if v != nil {
-			if err := t.prefs.toggle(v.name); err != nil {
-				t.status = "could not keep the choice: " + err.Error()
+		if v != nil && t.editable() {
+			if v.removed {
+				t.status = "removed: d keeps it first"
+				return nil, frame.None
 			}
-			if _, isList := t.prefs.kind(v.name); !isList {
-				v.fold()
-				t.status = v.name + " is edited as text"
-			} else {
-				t.status = v.name + " is edited as a list"
-			}
-			t.redraw()
+			return t.switchForm(v), frame.None
 		}
 	case key.Matches(msg, keyUndo):
 		t.reset()
@@ -480,6 +481,20 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	return nil, frame.None
 }
 
+// switchForm edits a variable in the other form, list or text, and remembers that: L opens
+// the editor that the variable's enter will open from now on.
+func (t *varTab) switchForm(v *variable) tea.Cmd {
+	if err := t.prefs.toggle(v.name); err != nil {
+		t.status = "could not keep the choice: " + err.Error()
+	}
+	t.redraw()
+	if kind, isList := t.prefs.kind(v.name); isList {
+		return t.openList(v, kind)
+	}
+	v.fold()
+	return t.openDialog(dialogValue, v)
+}
+
 // openList shows the list editor for a variable, keeping the changes made in it before.
 func (t *varTab) openList(v *variable, kind listedit.Kind) tea.Cmd {
 	title := string(t.scope) + " › " + v.name
@@ -491,6 +506,7 @@ func (t *varTab) openList(v *variable, kind listedit.Kind) tea.Cmd {
 		v.list, v.listKind = listedit.New(title, kind, saved, winenv.Split(v.current().Data), nil), kind
 	}
 	v.list.Title = title
+	v.list.ExtraKeys = []key.Binding{key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "edit as text"))}
 	v.list.Resize(t.w, t.h)
 	v.list.Focus(true)
 	t.open = v
