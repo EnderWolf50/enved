@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/EnderWolf50/enved/frame"
 	"github.com/EnderWolf50/enved/listedit"
@@ -39,7 +38,7 @@ type varTab struct {
 	err        error // it could not be read
 	needsAdmin bool  // saving it asks for admin (UAC)
 
-	grid
+	listedit.Grid
 	open    *variable // the variable whose list editor is showing
 	dialog  *varDialog
 	status  string
@@ -90,7 +89,7 @@ func (t *varTab) step(from, to *[][]varState) bool {
 	case t.open.list == nil || !slices.Contains(t.vars, t.open):
 		t.open = nil // the state came from before the list editor was opened
 	default:
-		t.open.list.Resize(t.w, t.h)
+		t.open.list.Resize(t.W, t.H)
 		t.open.list.Focus(true)
 	}
 	t.refresh()
@@ -115,7 +114,7 @@ func (t *varTab) redo() {
 }
 
 func newVarTab(s winenv.Scope, st winenv.Store, prefs *listPrefs) *varTab {
-	t := &varTab{scope: s, st: st, prefs: prefs, grid: newGrid()}
+	t := &varTab{scope: s, st: st, prefs: prefs, Grid: listedit.NewGrid("filter by name or value")}
 	t.Load()
 	return t
 }
@@ -156,13 +155,13 @@ func (t *varTab) reset() {
 // ---- the table --------------------------------------------------------------------------
 
 func (t *varTab) columns() []table.Column {
-	return theme.Columns(t.w,
-		table.Column{Title: "", Width: 2}, table.Column{Title: "NAME", Width: min(28, max(t.w/4, 10))},
+	return theme.Columns(t.W,
+		table.Column{Title: "", Width: 2}, table.Column{Title: "NAME", Width: min(28, max(t.W/4, 10))},
 		table.Column{Title: "VALUE"}, table.Column{Title: "%", Width: 1}, table.Column{Title: "KIND", Width: 8})
 }
 
 func (t *varTab) Resize(w, h int) {
-	t.grid.resize(w, h, t.columns)
+	t.SetSize(w, h, t.columns)
 	for _, v := range t.vars {
 		if v.list != nil {
 			v.list.Resize(w, h)
@@ -172,7 +171,7 @@ func (t *varTab) Resize(w, h int) {
 }
 
 func (t *varTab) Focus(on bool) {
-	t.focused = on
+	t.Focused = on
 	if t.open != nil {
 		t.open.list.Focus(on)
 	}
@@ -180,7 +179,7 @@ func (t *varTab) Focus(on bool) {
 }
 
 func (t *varTab) refresh() {
-	t.narrow(len(t.vars), func(i int) string { return t.vars[i].name + "\x00" + t.vars[i].current().Data })
+	t.Narrow(len(t.vars), func(i int) string { return t.vars[i].name + "\x00" + t.vars[i].current().Data })
 	t.redraw()
 }
 
@@ -196,8 +195,8 @@ func (t *varTab) shownValue(v *variable) string {
 }
 
 func (t *varTab) redraw() {
-	cols := t.table.Columns()
-	t.paint(func(i int, cursor bool) table.Row {
+	cols := t.Table.Columns()
+	t.Paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
 		r := theme.NewRow(v.change(), theme.Pick(isSystem(v.name), theme.Info, theme.NoNote), cursor)
 		plain := lipgloss.NewStyle()
@@ -218,7 +217,7 @@ func (t *varTab) redraw() {
 }
 
 func (t *varTab) current() (*variable, int) {
-	i := t.grid.current()
+	i := t.Current()
 	if i < 0 {
 		return nil, -1
 	}
@@ -231,11 +230,11 @@ func (t *varTab) point(v *variable) {
 	if i < 0 {
 		return
 	}
-	if !slices.Contains(t.shown, i) {
-		t.filter.SetValue("")
+	if !slices.Contains(t.Shown, i) {
+		t.Filter.SetValue("")
 		t.refresh()
 	}
-	t.grid.point(i)
+	t.Point(i)
 	t.redraw()
 }
 
@@ -290,7 +289,7 @@ func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 		if t.dialog != nil {
 			cmd = t.dialog.update(msg)
 		} else {
-			t.filter, cmd = t.filter.Update(msg)
+			t.Filter, cmd = t.Filter.Update(msg)
 		}
 		return cmd, frame.None
 	}
@@ -298,8 +297,8 @@ func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	switch {
 	case t.dialog != nil:
 		return t.updateDialog(k), frame.None
-	case t.filter.Focused():
-		cmd, changed := t.updateFilter(k)
+	case t.Filter.Focused():
+		cmd, changed := t.UpdateFilter(k)
 		if changed {
 			t.refresh()
 		}
@@ -312,8 +311,8 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	v, _ := t.current()
 	switch {
 	case key.Matches(msg, frame.KeyBack):
-		if t.filter.Value() != "" {
-			t.filter.SetValue("")
+		if t.Filter.Value() != "" {
+			t.Filter.SetValue("")
 			t.refresh()
 			return nil, frame.None
 		}
@@ -323,7 +322,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	case key.Matches(msg, frame.KeyReload):
 		return nil, frame.Reload
 	case key.Matches(msg, frame.KeyFilter):
-		return t.filter.Focus(), frame.None
+		return t.Filter.Focus(), frame.None
 	case key.Matches(msg, keyCopy):
 		if v != nil {
 			t.status = "copied the value of " + v.name
@@ -387,7 +386,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		t.history1(msg)
 	default:
 		var cmd tea.Cmd
-		t.table, cmd = t.table.Update(msg)
+		t.Table, cmd = t.Table.Update(msg)
 		t.redraw()
 		return cmd, frame.None
 	}
@@ -421,7 +420,7 @@ func (t *varTab) openList(v *variable, kind listedit.Kind) tea.Cmd {
 		v.list, v.listKind = listedit.New(title, kind, saved, winenv.Split(v.current().Data), nil), kind
 	}
 	v.list.Title = title
-	v.list.Resize(t.w, t.h)
+	v.list.Resize(t.W, t.H)
 	v.list.Focus(true)
 	t.open = v
 	return nil
@@ -474,8 +473,7 @@ func (t *varTab) Body() string {
 	if t.open != nil {
 		return t.open.list.Body()
 	}
-	width := max(t.w, 0)
-	detail := make([]string, 2)
+	var detail [2]string
 	if v, _ := t.current(); v != nil {
 		cur := v.current()
 		line := theme.Accent.Render(v.name) + theme.Dim.Render(" = ") + cur.Data
@@ -509,29 +507,10 @@ func (t *varTab) Body() string {
 		}
 		detail[1] = theme.Dim.Render(strings.Join(facts, " · "))
 	}
-	for i := range detail {
-		detail[i] = ansi.Truncate(detail[i], width, "…")
-	}
-
-	help := t.footer(
+	return t.Layout(theme.Legend(true, "system", ""), detail, "no variables · a adds one",
 		[]key.Binding{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack},
 		[]key.Binding{keyEdit, keyText, keyAdd, keyRename, frame.KeyRemove},
 		[]key.Binding{keyType, keyList},
 		[]key.Binding{keyCopyName, keyCopy},
 		[]key.Binding{frame.KeyUndo, frame.KeyRedo, frame.KeySave, frame.KeyReload})
-	body := t.table.View()
-	if len(t.shown) == 0 {
-		note := "no variables · a adds one"
-		if t.filter.Value() != "" {
-			note = "nothing matches the filter · esc clears it"
-		}
-		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
-	}
-	return strings.Join([]string{
-		t.filterLine(),
-		body, "",
-		theme.Divider(width, theme.Legend(true, "system", "")),
-		strings.Join(detail, "\n"),
-		help,
-	}, "\n")
 }

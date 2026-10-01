@@ -9,9 +9,9 @@ import (
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/EnderWolf50/enved/frame"
+	"github.com/EnderWolf50/enved/listedit"
 	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
 )
@@ -22,12 +22,12 @@ type processTab struct {
 	environ func() []string
 	scopes  []*varTab // the User and Machine tabs, for the saved values
 	vars    []winenv.Var
-	grid
+	listedit.Grid
 	status string
 }
 
 func newProcessTab(scopes []*varTab) *processTab {
-	t := &processTab{environ: os.Environ, scopes: scopes, grid: newGrid()}
+	t := &processTab{environ: os.Environ, scopes: scopes, Grid: listedit.NewGrid("filter by name or value")}
 	t.Load()
 	return t
 }
@@ -38,11 +38,11 @@ func (t *processTab) Count() string   { return fmt.Sprint(len(t.vars)) }
 func (t *processTab) Err() error      { return nil }
 func (t *processTab) Overlay() string { return "" }
 func (t *processTab) Status() string  { return t.status }
-func (t *processTab) Focus(on bool)   { t.focused = on; t.redraw() }
-func (t *processTab) Resize(w, h int) { t.grid.resize(w, h, t.columns); t.redraw() }
+func (t *processTab) Focus(on bool)   { t.Focused = on; t.redraw() }
+func (t *processTab) Resize(w, h int) { t.SetSize(w, h, t.columns); t.redraw() }
 func (t *processTab) columns() []table.Column {
-	return theme.Columns(t.w,
-		table.Column{Title: "", Width: 2}, table.Column{Title: "NAME", Width: min(28, max(t.w/4, 10))},
+	return theme.Columns(t.W,
+		table.Column{Title: "", Width: 2}, table.Column{Title: "NAME", Width: min(28, max(t.W/4, 10))},
 		table.Column{Title: "VALUE"}, table.Column{Title: "STATE", Width: 10})
 }
 
@@ -114,13 +114,13 @@ func (t *processTab) state(v winenv.Var) string {
 }
 
 func (t *processTab) refresh() {
-	t.narrow(len(t.vars), func(i int) string { return t.vars[i].Name + "\x00" + t.vars[i].Data })
+	t.Narrow(len(t.vars), func(i int) string { return t.vars[i].Name + "\x00" + t.vars[i].Data })
 	t.redraw()
 }
 
 func (t *processTab) redraw() {
-	cols := t.table.Columns()
-	t.paint(func(i int, cursor bool) table.Row {
+	cols := t.Table.Columns()
+	t.Paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
 		state := t.state(v)
 		r := theme.NewRow(theme.Unchanged, theme.Pick(state == "stale", theme.Info, theme.NoNote), cursor)
@@ -134,12 +134,12 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		var cmd tea.Cmd
-		t.filter, cmd = t.filter.Update(msg)
+		t.Filter, cmd = t.Filter.Update(msg)
 		return cmd, frame.None
 	}
 	t.status = ""
-	if t.filter.Focused() {
-		cmd, changed := t.updateFilter(k)
+	if t.Filter.Focused() {
+		cmd, changed := t.UpdateFilter(k)
 		if changed {
 			t.refresh()
 		}
@@ -147,20 +147,20 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	}
 	switch {
 	case key.Matches(k, frame.KeyBack):
-		if t.filter.Value() != "" {
-			t.filter.SetValue("")
+		if t.Filter.Value() != "" {
+			t.Filter.SetValue("")
 			t.refresh()
 			return nil, frame.None
 		}
 		return nil, frame.Back
 	case key.Matches(k, frame.KeyFilter):
-		return t.filter.Focus(), frame.None
+		return t.Filter.Focus(), frame.None
 	case key.Matches(k, frame.KeyReload):
 		return nil, frame.Reload
 	case key.Matches(k, frame.KeySave):
 		return nil, frame.Save
 	case key.Matches(k, keyCopy, keyCopyName):
-		if i := t.current(); i >= 0 {
+		if i := t.Current(); i >= 0 {
 			v := t.vars[i]
 			if key.Matches(k, keyCopyName) {
 				t.status = "copied the name " + v.Name
@@ -175,7 +175,7 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 		return nil, frame.None
 	}
 	var cmd tea.Cmd
-	t.table, cmd = t.table.Update(k)
+	t.Table, cmd = t.Table.Update(k)
 	t.redraw()
 	return cmd, frame.None
 }
@@ -195,9 +195,8 @@ func (t *processTab) Heading() string {
 }
 
 func (t *processTab) Body() string {
-	width := max(t.w, 0)
-	detail := make([]string, 2)
-	if i := t.current(); i >= 0 {
+	var detail [2]string
+	if i := t.Current(); i >= 0 {
 		v := t.vars[i]
 		detail[0] = theme.Accent.Render(v.Name) + theme.Dim.Render(" = ") + v.Data
 		switch t.state(v) {
@@ -210,18 +209,8 @@ func (t *processTab) Body() string {
 			detail[1] = theme.Dim.Render("the same as the saved value")
 		}
 	}
-	for i := range detail {
-		detail[i] = ansi.Truncate(detail[i], width, "…")
-	}
-	help := t.footer(
+	return t.Layout(theme.Legend(false, "stale", ""), detail, "",
 		[]key.Binding{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack},
 		[]key.Binding{keyCopyName, keyCopy},
 		[]key.Binding{frame.KeyReload})
-	return strings.Join([]string{
-		t.filterLine(),
-		t.table.View(), "",
-		theme.Divider(width, theme.Legend(false, "stale", "")),
-		strings.Join(detail, "\n"),
-		help,
-	}, "\n")
 }

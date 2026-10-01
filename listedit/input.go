@@ -30,7 +30,7 @@ func (m *Model) openInput(at int, adding bool) tea.Cmd {
 	f := textinput.New()
 	f.Prompt = "› "
 	f.Placeholder = m.kind.placeholder()
-	f.SetWidth(min(70, max(m.w-16, 20)))
+	f.SetWidth(min(70, max(m.W-16, 20)))
 	if !adding {
 		f.SetValue(m.entries[at].value)
 		f.CursorEnd()
@@ -67,7 +67,7 @@ func (m *Model) Overlay() string {
 		}
 	}
 	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + b.field.View() + "\n\n" + check +
-		"\n\n" + m.help.ShortHelpView([]key.Binding{KeyAccept, KeyCancel}))
+		"\n\n" + m.Help.ShortHelpView([]key.Binding{KeyAccept, KeyCancel}))
 }
 
 // The input box: only its own keys count while it is open.
@@ -98,12 +98,12 @@ func (m *Model) updateInput(msg tea.KeyPressMsg) tea.Cmd {
 			m.entries[at].value = v
 		}
 		// Clear the filter if it would hide what was just typed, then put the cursor on it.
-		if !strings.Contains(strings.ToLower(v), strings.ToLower(m.filter.Value())) {
-			m.filter.SetValue("")
+		if !strings.Contains(strings.ToLower(v), strings.ToLower(m.Filter.Value())) {
+			m.Filter.SetValue("")
 		}
 		m.refresh()
-		if row := slices.Index(m.shown, at); row >= 0 {
-			m.table.SetCursor(row)
+		if row := slices.Index(m.Shown, at); row >= 0 {
+			m.Table.SetCursor(row)
 			m.redraw()
 		}
 		return nil

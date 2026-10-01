@@ -125,7 +125,7 @@ enved and pathed are built from these packages:
 | --- | --- |
 | `winenv` | the registry: read, check and write changes, back up, broadcast |
 | `elevate` | writing through UAC: one prompt per save, the changes on the command line |
-| `listedit` | the list editor, as a Bubble Tea component |
+| `listedit` | the list editor, as a Bubble Tea component, and the filtered table (`Grid`) it shares with the variables' tabs |
 | `frame` | sidebar, panel, review, save and quit dialog around a program's tabs |
 | `theme` | the settings file's `[theme]`, the styles, painted table rows |
 | `internal/app` | the two programs: their commands, tabs and dialogs |

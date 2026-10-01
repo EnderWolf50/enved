@@ -569,7 +569,7 @@ func TestCursorRowPaintedEdgeToEdge(t *testing.T) {
 		m := testModel(t, st)
 		m = sized(m, w, 20)
 		m = press(m, "enter", "j", "d") // cursor on a removed variable
-		for _, line := range strings.Split(vars(m).table.View(), "\n") {
+		for _, line := range strings.Split(vars(m).Table.View(), "\n") {
 			if !strings.Contains(ansi.Strip(line), "BBB") {
 				continue
 			}

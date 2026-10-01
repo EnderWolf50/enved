@@ -44,7 +44,7 @@ func (t *varTab) openDialog(mode dialogMode, v *variable) tea.Cmd {
 		f := textinput.New()
 		f.Prompt = "› "
 		f.Placeholder = placeholder
-		f.SetWidth(min(70, max(t.w-16, 20)))
+		f.SetWidth(min(70, max(t.W-16, 20)))
 		f.SetValue(value)
 		f.CursorEnd()
 		return f
@@ -115,7 +115,7 @@ func (d *varDialog) view(t *varTab) string {
 	if d.mode == dialogAdd {
 		keys = []key.Binding{keyField, keyNextThenKeep, listedit.KeyCancel}
 	}
-	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + strings.Join(lines, "\n") + "\n" + t.help.ShortHelpView(keys))
+	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + strings.Join(lines, "\n") + "\n" + t.Help.ShortHelpView(keys))
 }
 
 // expands says what type the typed value would be saved as.

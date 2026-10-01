@@ -104,7 +104,7 @@ func TestCursorRowPaintedEdgeToEdge(t *testing.T) {
 		m.Focus(true)
 		m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 		m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"}) // cursor on a removed, missing entry
-		for _, line := range strings.Split(m.table.View(), "\n") {
+		for _, line := range strings.Split(m.Table.View(), "\n") {
 			if !strings.Contains(ansi.Strip(line), `C:\missing`) {
 				continue
 			}
@@ -152,7 +152,7 @@ func TestAppendAndInsert(t *testing.T) {
 	m.Focus(true)
 	keys(m, "i", "a", "enter")      // before b, the cursor's
 	keys(m, "j", "a", "c", "enter") // the cursor is on the new a; j moves to b, a appends after it
-	m.table.SetCursor(len(m.entries) - 1)
+	m.Table.SetCursor(len(m.entries) - 1)
 	keys(m, "a", "e", "enter") // after d, the last
 	if want := []string{"a", "b", "c", "d", "e"}; !slices.Equal(m.Result(), want) {
 		t.Fatalf("result %q, want %q", m.Result(), want)

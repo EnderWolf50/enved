@@ -12,13 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/EnderWolf50/enved/frame"
 	"github.com/EnderWolf50/enved/theme"
@@ -75,13 +72,8 @@ type Model struct {
 	saved   []string
 	entries []*entry
 
-	shown   []int // positions in entries that the table shows, narrowed by the filter
-	table   table.Model
-	filter  textinput.Model
-	help    help.Model
+	Grid    // the table of entries, its filter and the body around it
 	input   *inputBox
-	focused bool
-	w, h    int        // the body's size
 	status  string     // a one-off note, cleared by the next key
 	history []Snapshot // the entries before each change, for u
 	future  []Snapshot // the entries before each undo, for z
@@ -140,9 +132,7 @@ func New(title string, kind Kind, saved, current []string, exists func(string) b
 	if exists == nil {
 		exists = Exists(kind)
 	}
-	m := &Model{Title: title, kind: kind, exists: exists, filter: textinput.New(), help: help.New(), table: theme.NewTable()}
-	m.filter.Prompt = "/ "
-	m.filter.Placeholder = "filter the entries"
+	m := &Model{Title: title, kind: kind, exists: exists, Grid: NewGrid("filter the entries")}
 	m.Reset(saved, current)
 	return m
 }
@@ -270,42 +260,28 @@ func (m *Model) Status() string { return m.status }
 
 // Focus says whether the editor has the keys; the cursor row is only painted while it does.
 func (m *Model) Focus(on bool) {
-	m.focused = on
+	m.Focused = on
 	m.redraw()
 }
 
 // Busy says whether a dialog or the filter is taking the keys.
-func (m *Model) Busy() bool { return m.input != nil || m.filter.Focused() }
-
-// Lines of the body around the table: the filter above; a blank, the divider and two detail
-// lines below. The help takes as many more as it needs.
-const chrome = 5
+func (m *Model) Busy() bool { return m.input != nil || m.Filter.Focused() }
 
 // Resize fits the editor to a body of w by h cells.
 func (m *Model) Resize(w, h int) {
-	m.w, m.h = w, h
-	m.table.SetColumns(m.columns())
-	m.table.SetWidth(w)
-	m.filter.SetWidth(w - 2)
-	m.help.SetWidth(w)
+	m.SetSize(w, h, m.columns)
 	m.redraw()
 }
 
 func (m *Model) columns() []table.Column {
-	return theme.Columns(m.w,
+	return theme.Columns(m.W,
 		table.Column{Title: "", Width: 2}, table.Column{Title: "#", Width: 3},
 		table.Column{Title: m.kind.column()}, table.Column{Title: "STATUS", Width: 12})
 }
 
 // refresh recomputes which entries the table shows.
 func (m *Model) refresh() {
-	query := strings.ToLower(m.filter.Value())
-	m.shown = nil
-	for i, e := range m.entries {
-		if strings.Contains(strings.ToLower(e.value), query) {
-			m.shown = append(m.shown, i)
-		}
-	}
+	m.Narrow(len(m.entries), func(i int) string { return m.entries[i].value })
 	m.redraw()
 }
 
@@ -313,15 +289,9 @@ func (m *Model) refresh() {
 // move, because the cursor mark, the status and the row colors live in the cells.
 func (m *Model) redraw() {
 	problem, dupOf := m.health()
-	cursor := min(m.table.Cursor(), max(len(m.shown)-1, 0))
-	cols := m.table.Columns()
-	if len(cols) < 4 {
-		return // not sized yet
-	}
-	cells := make([]table.Row, len(m.shown))
-	for row, i := range m.shown {
+	cols := m.Table.Columns()
+	m.Paint(func(i int, onCursor bool) table.Row {
 		e := m.entries[i]
-		onCursor := row == cursor && m.focused
 		r := theme.NewRow(e.change(), theme.Pick(!e.removed && (problem[i] != "" || dupOf[i] > 0), theme.Problem, theme.NoNote), onCursor)
 		plain := lipgloss.NewStyle()
 		value, state := r.Paint(plain, e.value), r.Paint(theme.OK, "ok")
@@ -333,19 +303,16 @@ func (m *Model) redraw() {
 		case problem[i] != "":
 			state = r.Paint(theme.Err, problem[i])
 		}
-		cells[row] = r.Cells(cols, r.Mark(e.change(), onCursor), r.Paint(theme.Dim, fmt.Sprint(i+1)), value, state)
-	}
-	m.table.SetRows(cells)
-	m.table.SetCursor(cursor)
+		return r.Cells(cols, r.Mark(e.change(), onCursor), r.Paint(theme.Dim, fmt.Sprint(i+1)), value, state)
+	})
 }
 
 // current is the entry under the cursor and its position.
 func (m *Model) current() (*entry, int, bool) {
-	c := m.table.Cursor()
-	if c < 0 || c >= len(m.shown) {
+	i := m.Current()
+	if i < 0 {
 		return nil, -1, false
 	}
-	i := m.shown[c]
 	return m.entries[i], i, true
 }
 
@@ -357,7 +324,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 		if m.input != nil {
 			m.input.field, cmd = m.input.field.Update(msg)
 		} else {
-			m.filter, cmd = m.filter.Update(msg)
+			m.Filter, cmd = m.Filter.Update(msg)
 		}
 		return cmd, frame.None
 	}
@@ -365,7 +332,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	switch {
 	case m.input != nil:
 		return m.updateInput(k), frame.None
-	case m.filter.Focused():
+	case m.Filter.Focused():
 		return m.updateFilter(k), frame.None
 	}
 	return m.updateList(k)
@@ -373,20 +340,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 
 // Typing a filter: the table narrows as you type; enter keeps it, esc drops it.
 func (m *Model) updateFilter(msg tea.KeyPressMsg) tea.Cmd {
-	switch {
-	case key.Matches(msg, KeyFilterKeep):
-		m.filter.Blur()
-		return nil
-	case key.Matches(msg, KeyFilterClear):
-		m.filter.Blur()
-		m.filter.SetValue("")
+	cmd, changed := m.UpdateFilter(msg)
+	if changed {
 		m.refresh()
-		return nil
 	}
-	var cmd tea.Cmd
-	m.filter, cmd = m.filter.Update(msg)
-	m.table.SetCursor(0)
-	m.refresh()
 	return cmd
 }
 
@@ -409,8 +366,8 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	e, i, ok := m.current()
 	switch {
 	case key.Matches(msg, frame.KeyBack): // one level up: first out of a filter, then out
-		if m.filter.Value() != "" {
-			m.filter.SetValue("")
+		if m.Filter.Value() != "" {
+			m.Filter.SetValue("")
 			m.refresh()
 			return nil, frame.None
 		}
@@ -420,7 +377,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	case key.Matches(msg, frame.KeyReload):
 		return nil, frame.Reload
 	case key.Matches(msg, frame.KeyFilter):
-		return m.filter.Focus(), frame.None
+		return m.Filter.Focus(), frame.None
 	case key.Matches(msg, keyOpen):
 		if ok && m.kind.onDisk() {
 			open(winenv.Expand(e.value))
@@ -448,14 +405,14 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	case key.Matches(msg, keyMoveUp, keyMoveDn):
 		switch {
 		case !ok || !m.editable():
-		case m.filter.Value() != "":
+		case m.Filter.Value() != "":
 			m.status = "clear the filter (esc) to reorder"
 		default:
 			to := i + theme.Pick(key.Matches(msg, keyMoveDn), 1, -1)
 			if to >= 0 && to < len(m.entries) {
 				m.remember()
 				m.entries[i], m.entries[to] = m.entries[to], m.entries[i]
-				m.table.SetCursor(to)
+				m.Table.SetCursor(to)
 				m.refresh()
 			}
 		}
@@ -473,7 +430,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		}
 	default:
 		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
+		m.Table, cmd = m.Table.Update(msg)
 		m.redraw()
 		return cmd, frame.None
 	}
@@ -533,17 +490,11 @@ func (m *Model) Heading() string {
 
 // Body is the filter, the table, the entry under the cursor and the keys.
 func (m *Model) Body() string {
-	width := max(m.w, 0)
 	problem, dupOf := m.health()
-
-	filter := ""
-	if m.filter.Focused() || m.filter.Value() != "" {
-		filter = m.filter.View()
-	}
 
 	// The entry under the cursor: what it expands to and what is wrong with it; then how it
 	// changed.
-	detail := make([]string, 2)
+	var detail [2]string
 	if e, i, ok := m.current(); ok {
 		where := theme.Accent.Render(fmt.Sprintf("#%d", i+1)) + "  " + e.value
 		if x := winenv.Expand(e.value); x != e.value {
@@ -568,50 +519,20 @@ func (m *Model) Body() string {
 			detail[1] = theme.Warn.Render("edited") + theme.Dim.Render(" · was  "+e.orig)
 		}
 	}
-	for i := range detail {
-		detail[i] = ansi.Truncate(detail[i], width, "…")
-	}
-
-	help := m.footer()
-	body := m.table.View()
-	if len(m.shown) == 0 {
-		note := "this list is empty · a adds an entry"
-		if m.filter.Value() != "" {
-			note = "nothing matches the filter · esc clears it"
-		}
-		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
-	}
-
-	return strings.Join([]string{
-		filter,
-		body, "",
-		theme.Divider(width, theme.Legend(!m.ReadOnly, "", m.kind.noted())),
-		strings.Join(detail, "\n"),
-		help,
-	}, "\n")
+	return m.Layout(theme.Legend(!m.ReadOnly, "", m.kind.noted()), detail, "this list is empty · a adds an entry", m.keys()...)
 }
 
-// footer is the help under the table: groups of related keys, over as many lines as they
-// need, which the table gives up. While the filter is typed its own keys take those lines.
-func (m *Model) footer() string {
+// keys are the help under the table, in groups of related keys.
+func (m *Model) keys() [][]key.Binding {
 	edit := []key.Binding{keyEdit, keyAppend, frame.KeyRemove, keyMoveUp, keyClean}
 	if m.kind.onDisk() {
 		edit = append(edit, keyOpen)
 	}
-	groups := [][]key.Binding{{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack}, edit, {frame.KeyUndo, frame.KeyRedo, frame.KeySave, frame.KeyReload}}
+	move := []key.Binding{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack}
 	if m.ReadOnly {
-		groups = [][]key.Binding{{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack}}
+		return [][]key.Binding{move}
 	}
-	lines := theme.HelpLines(m.help, m.w, groups...)
-	m.table.SetHeight(max(m.h-chrome-len(lines), 1))
-	if m.filter.Focused() {
-		n := len(lines)
-		lines = theme.HelpLines(m.help, m.w, []key.Binding{KeyFilterKeep, KeyFilterClear})
-		for len(lines) < n {
-			lines = append(lines, "")
-		}
-	}
-	return strings.Join(lines, "\n")
+	return [][]key.Binding{move, edit, {frame.KeyUndo, frame.KeyRedo, frame.KeySave, frame.KeyReload}}
 }
 
 // Review lists every change, for the review before saving.
