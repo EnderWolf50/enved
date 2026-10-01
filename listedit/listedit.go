@@ -66,6 +66,9 @@ var (
 type Model struct {
 	Title    string // the heading: "User PATH", "User › PSModulePath"
 	ReadOnly bool   // a list that cannot be changed, only looked at
+	// OnChange, when set, is called before each change instead of the editor keeping its
+	// own history: a holder with a history of its own records the change there.
+	OnChange func()
 
 	kind    Kind
 	exists  func(string) bool
@@ -77,7 +80,6 @@ type Model struct {
 	status  string     // a one-off note, cleared by the next key
 	history []Snapshot // the entries before each change, for u
 	future  []Snapshot // the entries before each undo, for z
-	edits   int        // how many changes were made, undos and redos included
 }
 
 // Snapshot is the entries at one moment, for undo.
@@ -102,15 +104,14 @@ func (m *Model) Restore(s Snapshot) {
 	m.refresh()
 }
 
-// Edits counts the changes made so far: a holder compares it before and after a key to
-// learn whether the key changed the list.
-func (m *Model) Edits() int { return m.edits }
-
 // remember keeps the entries as they are, before a change; the change ends what z could
 // redo.
 func (m *Model) remember() {
+	if m.OnChange != nil {
+		m.OnChange()
+		return
+	}
 	m.history, m.future = append(m.history, m.Snapshot()), nil
-	m.edits++
 }
 
 // step moves one state from one stack to the other: from history for undo, from future for
@@ -121,7 +122,6 @@ func (m *Model) step(from, to *[]Snapshot) bool {
 	}
 	last := (*from)[len(*from)-1]
 	*from, *to = (*from)[:len(*from)-1], append(*to, m.Snapshot())
-	m.edits++
 	m.Restore(last)
 	return true
 }

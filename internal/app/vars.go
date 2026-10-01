@@ -265,18 +265,14 @@ func (t *varTab) editable() bool {
 
 func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
-		// u, U and z in the list editor work on the scope's history, which covers the table
+		// u and z in the list editor work on the scope's history, which covers the table
 		// and every list.
 		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, frame.KeyUndo, frame.KeyRedo) && !t.open.list.Busy() {
 			t.status = ""
 			t.history1(k)
 			return nil, frame.None
 		}
-		list, edits, before := t.open.list, t.open.list.Edits(), t.snapshot()
-		cmd, ev := list.Update(msg)
-		if list.Edits() != edits {
-			t.history = append(t.history, before)
-		}
+		cmd, ev := t.open.list.Update(msg)
 		if ev == frame.Back {
 			t.closeList()
 			return cmd, frame.None
@@ -418,6 +414,7 @@ func (t *varTab) openList(v *variable, kind listedit.Kind) tea.Cmd {
 			saved = winenv.Split(v.orig.Data)
 		}
 		v.list, v.listKind = listedit.New(title, kind, saved, winenv.Split(v.current().Data), nil), kind
+		v.list.OnChange = t.remember // one history for the table and every list
 	}
 	v.list.Title = title
 	v.list.Resize(t.W, t.H)
