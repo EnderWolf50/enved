@@ -3,14 +3,10 @@
 package theme
 
 import (
-	"errors"
 	"fmt"
 	"image/color"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/BurntSushi/toml"
@@ -94,56 +90,6 @@ func validColor(s string) bool {
 	return err == nil && n >= 0 && n <= 255
 }
 
-// Path is $<PROGRAM>_CONFIG, else <program>/config.toml in $XDG_CONFIG_HOME or ~/.config.
-func Path(program string) string {
-	if p := os.Getenv(strings.ToUpper(program) + "_CONFIG"); p != "" {
-		return p
-	}
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".config")
-	}
-	return filepath.Join(dir, program, "config.toml")
-}
-
-// Parse decodes text over base, keeping what text leaves out, and checks the result: a typo
-// in a key or a value is an error, not a setting silently ignored.
-func Parse[T any](base T, text string, check func(T) error) (T, error) {
-	c := base
-	md, err := toml.Decode(text, &c)
-	if err != nil {
-		return base, err
-	}
-	if keys := md.Undecoded(); len(keys) > 0 {
-		var names []string
-		for _, k := range keys {
-			names = append(names, k.String())
-		}
-		return base, fmt.Errorf("unknown setting %s", strings.Join(names, ", "))
-	}
-	if err := check(c); err != nil {
-		return base, err
-	}
-	return c, nil
-}
-
-// Load reads the file at path over base; no file means base.
-func Load[T any](path string, base T, check func(T) error) (T, error) {
-	text, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return base, nil
-	}
-	if err != nil {
-		return base, err
-	}
-	c, err := Parse(base, string(text), check)
-	if err != nil {
-		return base, fmt.Errorf("%s: %w", path, err)
-	}
-	return c, nil
-}
-
 // The theme's colors and the styles made from them, set by Apply.
 var (
 	ColorAccent, ColorDim, ColorFaint, ColorOK, ColorBad, ColorWarn color.Color
@@ -167,9 +113,9 @@ type onlyTheme struct {
 }
 
 func init() {
-	c, err := Parse(onlyTheme{}, Default, func(c onlyTheme) error { return c.Theme.Check() })
-	if err != nil {
-		panic("the default theme is broken: " + err.Error())
+	var c onlyTheme
+	if _, err := toml.Decode(Default, &c); err != nil || c.Theme.Check() != nil {
+		panic(fmt.Sprint("the default theme is broken: ", err, c.Theme.Check()))
 	}
 	Apply(c.Theme)
 }

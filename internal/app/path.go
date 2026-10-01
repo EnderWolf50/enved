@@ -79,10 +79,11 @@ func runPath(st winenv.Store, f flags, rest []string) error {
 		return err
 	}
 	if len(rest) == 0 {
-		if err := loadConfig(); err != nil {
+		c, err := loadConfig()
+		if err != nil {
 			return err
 		}
-		_, err := tea.NewProgram(newPathModel(st, isFolder, f.scope)).Run()
+		_, err = tea.NewProgram(newPathModel(c, st, isFolder, f.scope)).Run()
 		return err
 	}
 	write := func(n []string, what string) error {

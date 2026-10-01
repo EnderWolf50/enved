@@ -32,21 +32,14 @@ func newProcessTab(scopes []*varTab) *processTab {
 	return t
 }
 
-func (t *processTab) Name() string             { return "Process" }
-func (t *processTab) Label() string            { return "This process" }
-func (t *processTab) Count() string            { return fmt.Sprint(len(t.vars)) }
-func (t *processTab) Err() error               { return nil }
-func (t *processTab) ReadOnly() bool           { return true }
-func (t *processTab) NeedsAdmin() bool         { return false }
-func (t *processTab) Dirty() bool              { return false }
-func (t *processTab) Pending() int             { return 0 }
-func (t *processTab) Changes() []winenv.Change { return nil }
-func (t *processTab) Review() []string         { return nil }
-func (t *processTab) Warnings() []string       { return nil }
-func (t *processTab) Overlay() string          { return "" }
-func (t *processTab) Status() string           { return t.status }
-func (t *processTab) Focus(on bool)            { t.focused = on; t.redraw() }
-func (t *processTab) Resize(w, h int)          { t.grid.resize(w, h, t.columns); t.redraw() }
+func (t *processTab) Name() string    { return "Process" }
+func (t *processTab) Label() string   { return "This process" }
+func (t *processTab) Count() string   { return fmt.Sprint(len(t.vars)) }
+func (t *processTab) Err() error      { return nil }
+func (t *processTab) Overlay() string { return "" }
+func (t *processTab) Status() string  { return t.status }
+func (t *processTab) Focus(on bool)   { t.focused = on; t.redraw() }
+func (t *processTab) Resize(w, h int) { t.grid.resize(w, h, t.columns); t.redraw() }
 func (t *processTab) columns() []table.Column {
 	return theme.Columns(t.w,
 		table.Column{Title: "", Width: 2}, table.Column{Title: "NAME", Width: min(28, max(t.w/4, 10))},
@@ -106,10 +99,10 @@ func (t *processTab) state(v winenv.Var) string {
 	case entries != nil:
 		have := map[string]bool{}
 		for _, e := range winenv.Split(v.Data) {
-			have[strings.ToLower(strings.TrimRight(e, `\/`))] = true
+			have[pathKey(e)] = true
 		}
 		for _, e := range entries {
-			if !have[strings.ToLower(strings.TrimRight(e, `\/`))] {
+			if !have[pathKey(e)] {
 				return "stale"
 			}
 		}

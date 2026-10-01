@@ -75,11 +75,11 @@ func fakeStore(user, machine map[string]string) (winenv.Store, map[winenv.Scope]
 
 func testModel(t *testing.T, st winenv.Store) frame.Model {
 	t.Helper()
-	prefs, err := loadLists(cfg, filepath.Join(t.TempDir(), "lists.toml"))
+	prefs, err := loadLists(defaults, filepath.Join(t.TempDir(), "lists.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := newModel(st, prefs, winenv.User, "")
+	m, err := newModel(defaults, st, prefs, winenv.User, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestMachineDeclinedKeepsChanges(t *testing.T) {
 		t.Fatalf("outcome %q", m.Outcome())
 	}
 	m = press(m, "esc", "esc", "j")
-	if !m.Tab().Dirty() {
+	if !m.Tab().(*varTab).Dirty() {
 		t.Fatal("Machine lost its change")
 	}
 	m = press(m, "q")
@@ -321,7 +321,7 @@ func TestTypeAndListToggles(t *testing.T) {
 		t.Fatal("L opened an editor")
 	}
 	prefs := vars(m).prefs
-	again, _ := loadLists(cfg, prefs.path)
+	again, _ := loadLists(defaults, prefs.path)
 	if _, isList := again.kind("dirs"); !isList {
 		t.Fatal("the choice was not kept")
 	}
@@ -476,8 +476,8 @@ func TestProcessStale(t *testing.T) {
 
 func TestEditOpensOnTheVariable(t *testing.T) {
 	st, _ := fakeStore(map[string]string{"A": "1", "PATHEXT": ".COM;.EXE"}, nil)
-	prefs, _ := loadLists(cfg, "")
-	m, err := newModel(st, prefs, winenv.User, "pathext")
+	prefs, _ := loadLists(defaults, "")
+	m, err := newModel(defaults, st, prefs, winenv.User, "pathext")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestEditOpensOnTheVariable(t *testing.T) {
 	if !strings.Contains(screen(m), "an extension is a dot") {
 		t.Fatalf("a bad extension was not flagged:\n%s", screen(m))
 	}
-	if _, err := newModel(st, prefs, winenv.User, "NOPE"); err == nil {
+	if _, err := newModel(defaults, st, prefs, winenv.User, "NOPE"); err == nil {
 		t.Fatal("edit of a missing variable did not fail")
 	}
 }
@@ -546,9 +546,9 @@ func TestShellInit(t *testing.T) {
 // The first frame is drawn before any WindowSizeMsg, and a terminal can be tiny.
 func TestViewAtAnySize(t *testing.T) {
 	st, _ := fakeStore(map[string]string{"A": "1", "Path": `C:\a`}, map[string]string{"B": "2"})
-	prefs, _ := loadLists(cfg, "")
+	prefs, _ := loadLists(defaults, "")
 	for _, size := range [][2]int{{0, 0}, {10, 3}, {30, 8}, {200, 60}} {
-		m, _ := newModel(st, prefs, winenv.User, "")
+		m, _ := newModel(defaults, st, prefs, winenv.User, "")
 		m.View()
 		m = sized(m, size[0], size[1])
 		m.View()

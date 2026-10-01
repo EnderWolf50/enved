@@ -34,6 +34,11 @@ func Known(name string) (Kind, bool) {
 	return k, ok
 }
 
+// String is what the entries are, in a sentence: "folders".
+func (k Kind) String() string {
+	return [...]string{"text", "folders", "files or folders", "extensions"}[k]
+}
+
 // column is the heading of the entries' column.
 func (k Kind) column() string {
 	return [...]string{"ENTRY", "FOLDER", "PATH", "EXTENSION"}[k]

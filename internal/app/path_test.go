@@ -56,7 +56,7 @@ func TestPathCLI(t *testing.T) {
 func TestPathEditor(t *testing.T) {
 	st, saved := fakeStore(map[string]string{"Path": `C:\a;C:\b`}, map[string]string{"Path": `C:\Windows`})
 	exists := func(p string) bool { return p != `C:\b` }
-	m := sized(newPathModel(st, exists, winenv.User), 120, 30)
+	m := sized(newPathModel(defaults, st, exists, winenv.User), 120, 30)
 	if s := screen(m); !strings.Contains(s, "User") || !strings.Contains(s, "Machine  admin") {
 		t.Fatalf("the sidebar:\n%s", s)
 	}

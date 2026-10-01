@@ -19,18 +19,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/EnderWolf50/enved/frame"
 	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
-)
-
-// Event is what a key asks of whatever holds the editor.
-type Event int
-
-const (
-	None   Event = iota
-	Back         // leave the editor
-	Save         // review and save the changes
-	Reload       // read the value again
 )
 
 // entry is one entry and how it changed since the last save.
@@ -367,7 +358,7 @@ func (m *Model) current() (*entry, int, bool) {
 }
 
 // Update takes a key (or the cursor's blink) and says what it asks of the holder.
-func (m *Model) Update(msg tea.Msg) (tea.Cmd, Event) {
+func (m *Model) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		var cmd tea.Cmd
@@ -376,14 +367,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, Event) {
 		} else {
 			m.filter, cmd = m.filter.Update(msg)
 		}
-		return cmd, None
+		return cmd, frame.None
 	}
 	m.status = ""
 	switch {
 	case m.input != nil:
-		return m.updateInput(k), None
+		return m.updateInput(k), frame.None
 	case m.filter.Focused():
-		return m.updateFilter(k), None
+		return m.updateFilter(k), frame.None
 	}
 	return m.updateList(k)
 }
@@ -422,34 +413,34 @@ func (m *Model) Undo() bool { return m.step(&m.history, &m.future) }
 // Redo makes the last change undone again; false when there is none.
 func (m *Model) Redo() bool { return m.step(&m.future, &m.history) }
 
-func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
+func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	e, i, ok := m.current()
 	switch {
 	case key.Matches(msg, keyBack): // one level up: first out of a filter, then out
 		if m.filter.Value() != "" {
 			m.filter.SetValue("")
 			m.refresh()
-			return nil, None
+			return nil, frame.None
 		}
-		return nil, Back
+		return nil, frame.Back
 	case key.Matches(msg, keySave):
-		return nil, Save
+		return nil, frame.Save
 	case key.Matches(msg, keyReload):
-		return nil, Reload
+		return nil, frame.Reload
 	case key.Matches(msg, keyFilter):
-		return m.filter.Focus(), None
+		return m.filter.Focus(), frame.None
 	case key.Matches(msg, keyOpen):
 		if ok && m.kind.onDisk() {
 			open(winenv.Expand(e.value))
 		}
-		return nil, None
+		return nil, frame.None
 	case key.Matches(msg, keyAppend, keyInsert):
 		if m.editable() {
-			return m.openAdd(i, key.Matches(msg, keyInsert)), None
+			return m.openAdd(i, key.Matches(msg, keyInsert)), frame.None
 		}
 	case key.Matches(msg, keyEdit):
 		if ok && m.editable() {
-			return m.openInput(i, false), None
+			return m.openInput(i, false), frame.None
 		}
 	case key.Matches(msg, keyRemove):
 		if ok && m.editable() {
@@ -492,9 +483,9 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, Event) {
 		var cmd tea.Cmd
 		m.table, cmd = m.table.Update(msg)
 		m.redraw()
-		return cmd, None
+		return cmd, frame.None
 	}
-	return nil, None
+	return nil, frame.None
 }
 
 // open shows a folder in Explorer, or a file selected in its folder.

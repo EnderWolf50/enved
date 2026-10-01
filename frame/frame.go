@@ -16,19 +16,18 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/EnderWolf50/enved/listedit"
 	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
 )
 
-// Event is what a key in a tab asks of the frame; the same as the list editor's.
-type Event = listedit.Event
+// Event is what a key in a tab asks of the frame.
+type Event int
 
 const (
-	None   = listedit.None
-	Back   = listedit.Back   // back to the sidebar
-	Save   = listedit.Save   // review and save
-	Reload = listedit.Reload // read the tab again
+	None   Event = iota
+	Back         // back to the sidebar (out of a list editor: back to what holds it)
+	Save         // review and save
+	Reload       // read the tab again
 )
 
 // Tab is one entry of the sidebar and what the panel shows for it.
@@ -37,15 +36,7 @@ type Tab interface {
 	Label() string // in the review and the outcome: "User PATH", "User variables"
 	Count() string // in the sidebar, after the name
 	Err() error    // it could not be read
-	ReadOnly() bool
-	NeedsAdmin() bool // saving it asks for admin (UAC)
-
-	Dirty() bool
-	Pending() int             // the number of changes, for the quit question
-	Changes() []winenv.Change // what saving writes
-	Review() []string         // the changes, one line each, for the review
-	Warnings() []string       // changes to confirm a second time before saving
-	Load()                    // read it again, dropping every change
+	Load()         // read it again, dropping every change
 	Update(tea.Msg) (tea.Cmd, Event)
 
 	Resize(w, h int) // the body's size
@@ -54,6 +45,22 @@ type Tab interface {
 	Body() string    // the rest of the panel
 	Overlay() string // a box drawn over the screen, or ""
 	Status() string  // the tab's one-off note, or ""
+}
+
+// Saver is a tab whose changes can be saved; a Tab that is not one is read-only.
+type Saver interface {
+	Tab
+	NeedsAdmin() bool         // saving it asks for admin (UAC)
+	Pending() int             // the number of changes, for the quit question
+	Changes() []winenv.Change // what saving writes
+	Review() []string         // the changes, one line each, for the review
+	Warnings() []string       // changes to confirm a second time before saving
+}
+
+// dirty is t's changes, if it can have any: saving would write something.
+func dirty(t Tab) (Saver, bool) {
+	s, ok := t.(Saver)
+	return s, ok && len(s.Changes()) > 0
 }
 
 // Options are what a program says about itself.
@@ -180,7 +187,7 @@ func (m Model) handle(ev Event, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) anyDirty() bool {
-	return slices.ContainsFunc(m.tabs, func(t Tab) bool { return t.Dirty() })
+	return slices.ContainsFunc(m.tabs, func(t Tab) bool { _, d := dirty(t); return d })
 }
 
 // The sidebar picks a tab; enter hands the keys to its body.
@@ -209,7 +216,7 @@ func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // reload reads the selected tab again, unless it has changes that would be lost.
 func (m Model) reload() (tea.Model, tea.Cmd) {
-	if m.tab().Dirty() {
+	if _, d := dirty(m.tab()); d {
 		m.status = "unsaved changes: save them, or undo them with u, first"
 		return m, nil
 	}
@@ -258,10 +265,11 @@ func (m Model) viewMain() string {
 			style, mark = theme.Accent, "▌ "
 		}
 		left := style.Render(mark + t.Name())
+		s, isDirty := dirty(t)
 		switch {
-		case t.ReadOnly():
+		case s == nil:
 			left += " " + theme.Badge.Render("read-only")
-		case t.NeedsAdmin():
+		case s.NeedsAdmin():
 			left += " " + theme.Badge.Render("admin")
 		}
 		count, flag := t.Count(), " "
@@ -270,7 +278,7 @@ func (m Model) viewMain() string {
 			count, flag = "", theme.Err.Render("!")
 		case m.saveErr[i] != nil:
 			flag = theme.Err.Render("!")
-		case t.Dirty():
+		case isDirty:
 			flag = style.Render("*")
 		}
 		// The panel's border and padding take 4 cells; a space, the count 3 and the flag 1.
@@ -303,14 +311,15 @@ func (m Model) viewPanel() string {
 	t := m.tab()
 	width := max(m.w-m.opts.SidebarWidth-theme.Panel.GetHorizontalFrameSize(), 0)
 	heading := t.Heading()
+	s, _ := t.(Saver)
 	switch {
 	case t.Err() != nil:
 		heading += theme.Err.Render(" · could not be read: " + t.Err().Error())
 	case m.saveErr[m.on] != nil:
 		heading += theme.Err.Render(" · not saved: " + m.saveErr[m.on].Error())
-	case t.ReadOnly():
+	case s == nil:
 		heading += theme.Dim.Render(" · read-only")
-	case t.NeedsAdmin():
+	case s.NeedsAdmin():
 		heading += theme.Dim.Render(" · saving asks for admin (UAC)")
 	}
 	if s := m.Status(); s != "" {
@@ -324,7 +333,9 @@ func (m Model) viewPanel() string {
 func (m Model) quitDialog() string {
 	n := 0
 	for _, t := range m.tabs {
-		n += t.Pending()
+		if s, ok := t.(Saver); ok {
+			n += s.Pending()
+		}
 	}
 	return theme.Modal.Render(lipgloss.JoinVertical(lipgloss.Center,
 		theme.Err.Bold(true).Render("Quit without saving?"), "", theme.Plural(n, "change", "changes")+" will be lost.", "",
@@ -358,8 +369,8 @@ func (m Model) startReview() (tea.Model, tea.Cmd) {
 func (m Model) warnings() []string {
 	var all []string
 	for _, t := range m.tabs {
-		if t.Dirty() {
-			all = append(all, t.Warnings()...)
+		if s, d := dirty(t); d {
+			all = append(all, s.Warnings()...)
 		}
 	}
 	return all
@@ -369,18 +380,19 @@ func (m Model) warnings() []string {
 func (m Model) reviewLines(width int) []string {
 	var lines []string
 	for _, t := range m.tabs {
-		if !t.Dirty() {
+		s, d := dirty(t)
+		if !d {
 			continue
 		}
 		head := theme.Accent.Render(t.Label())
-		if t.NeedsAdmin() {
+		if s.NeedsAdmin() {
 			head += theme.Dim.Render("  saving it asks for admin: UAC will prompt")
 		}
 		lines = append(lines, head)
-		for _, w := range t.Warnings() {
+		for _, w := range s.Warnings() {
 			lines = append(lines, theme.Err.Render("  ! "+w))
 		}
-		lines = append(lines, t.Review()...)
+		lines = append(lines, s.Review()...)
 		lines = append(lines, "")
 	}
 	for i := range lines {
@@ -478,8 +490,8 @@ type savedMsg struct{ errs map[int]error }
 func (m Model) save() (tea.Model, tea.Cmd) {
 	jobs := map[int][]winenv.Change{}
 	for i, t := range m.tabs {
-		if t.Dirty() {
-			jobs[i] = t.Changes()
+		if s, d := dirty(t); d {
+			jobs[i] = s.Changes()
 		}
 	}
 	m.saving, m.confirmSave = true, false

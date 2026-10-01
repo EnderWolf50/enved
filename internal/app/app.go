@@ -16,7 +16,6 @@ import (
 
 	"github.com/EnderWolf50/enved/elevate"
 	"github.com/EnderWolf50/enved/frame"
-	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
 )
 
@@ -113,7 +112,7 @@ func runAs(prog string, args []string, st winenv.Store) error {
 			fmt.Print(defaultConfig)
 			return nil
 		case "--config":
-			path := theme.Path("enved")
+			path := configPath()
 			if _, err := os.Stat(path); err != nil {
 				path += "  (not there yet: enved --default-config > it, then edit)"
 			}
@@ -248,7 +247,7 @@ func unset(st winenv.Store, f flags, name string) error {
 }
 
 // newModel is the editor: a tab per scope, and the process's environment.
-func newModel(st winenv.Store, prefs *listPrefs, on winenv.Scope, name string) (frame.Model, error) {
+func newModel(c config, st winenv.Store, prefs *listPrefs, on winenv.Scope, name string) (frame.Model, error) {
 	var tabs []frame.Tab
 	var scopes []*varTab
 	start := 0
@@ -274,33 +273,23 @@ func newModel(st winenv.Store, prefs *listPrefs, on winenv.Scope, name string) (
 		}
 	}
 	opts := frame.Options{
-		SidebarWidth: cfg.SidebarWidth,
+		SidebarWidth: c.SidebarWidth,
 		Apply:        st.Apply,
 		AfterSave:    "New windows see the change; with the pwsh wrapper (enved init pwsh), this one does too once enved exits.",
 	}
 	return frame.New(opts, tabs, start, name != ""), nil
 }
 
-// loadConfig reads the settings file over the defaults and applies its theme.
-func loadConfig() error {
-	c, err := theme.Load(theme.Path("enved"), cfg, checkConfig)
-	if err != nil {
-		return err
-	}
-	cfg = c
-	theme.Apply(cfg.Theme)
-	return nil
-}
-
 func interactive(st winenv.Store, on winenv.Scope, name string) error {
-	if err := loadConfig(); err != nil {
-		return err
-	}
-	prefs, err := loadLists(cfg, listsPath())
+	c, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	m, err := newModel(st, prefs, on, name)
+	prefs, err := loadLists(c, listsPath())
+	if err != nil {
+		return err
+	}
+	m, err := newModel(c, st, prefs, on, name)
 	if err != nil {
 		return err
 	}

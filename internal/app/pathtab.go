@@ -8,6 +8,13 @@ import (
 	"github.com/EnderWolf50/enved/winenv"
 )
 
+// A tab that misses a method of Saver would quietly turn read-only; these catch it.
+var (
+	_ frame.Saver = (*pathTab)(nil)
+	_ frame.Saver = (*varTab)(nil)
+	_ frame.Tab   = (*processTab)(nil)
+)
+
 // pathTab is one scope's PATH in the list editor: pathed's screen, and enved path's.
 type pathTab struct {
 	scope           winenv.Scope
@@ -29,7 +36,6 @@ func (t *pathTab) Name() string     { return string(t.scope) }
 func (t *pathTab) Label() string    { return string(t.scope) + " PATH" }
 func (t *pathTab) Count() string    { return fmt.Sprint(len(t.Result())) }
 func (t *pathTab) Err() error       { return t.err }
-func (t *pathTab) ReadOnly() bool   { return false }
 func (t *pathTab) NeedsAdmin() bool { return t.needsAdmin }
 
 // Load reads the PATH again, dropping every change.
@@ -51,7 +57,7 @@ func (t *pathTab) Changes() []winenv.Change {
 }
 
 // newPathModel is the PATH editor: one tab per scope's PATH, the sidebar on scope on.
-func newPathModel(st winenv.Store, exists func(string) bool, on winenv.Scope) frame.Model {
+func newPathModel(c config, st winenv.Store, exists func(string) bool, on winenv.Scope) frame.Model {
 	var tabs []frame.Tab
 	start := 0
 	for i, s := range winenv.Scopes {
@@ -61,7 +67,7 @@ func newPathModel(st winenv.Store, exists func(string) bool, on winenv.Scope) fr
 		}
 	}
 	opts := frame.Options{
-		SidebarWidth: cfg.SidebarWidth,
+		SidebarWidth: c.SidebarWidth,
 		Apply:        st.Apply,
 		AfterSave:    "New windows see the change; with the pwsh wrapper (pathed init pwsh), this one does too once it exits.",
 	}
