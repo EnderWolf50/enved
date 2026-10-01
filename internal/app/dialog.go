@@ -5,11 +5,20 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/EnderWolf50/enved/listedit"
 	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
+)
+
+// The add dialog's own keys: tab moves between the fields; its enter goes on to the value
+// before it keeps.
+var (
+	keyField        = key.NewBinding(key.WithKeys("tab", "shift+tab"), key.WithHelp("tab", "name/value"))
+	keyNextThenKeep = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "next, then keep"))
 )
 
 // What the dialog asks for.
@@ -102,11 +111,11 @@ func (d *varDialog) view(t *varTab) string {
 		}
 		lines = append(lines, theme.Dim.Render("value"), d.value.View(), note, "")
 	}
-	help := "enter keep · esc cancel"
+	keys := []key.Binding{listedit.KeyAccept, listedit.KeyCancel}
 	if d.mode == dialogAdd {
-		help = "tab name/value · enter next, then keep · esc cancel"
+		keys = []key.Binding{keyField, keyNextThenKeep, listedit.KeyCancel}
 	}
-	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + strings.Join(lines, "\n") + "\n" + theme.Dim.Render(help))
+	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + strings.Join(lines, "\n") + "\n" + t.help.ShortHelpView(keys))
 }
 
 // expands says what type the typed value would be saved as.
@@ -120,16 +129,16 @@ func (d *varDialog) expands(v string) bool {
 // The dialog: only its own keys count while it is open.
 func (t *varTab) updateDialog(msg tea.KeyPressMsg) tea.Cmd {
 	d := t.dialog
-	switch msg.String() {
-	case "esc":
+	switch {
+	case key.Matches(msg, listedit.KeyCancel):
 		t.dialog = nil
 		return nil
-	case "tab", "shift+tab":
+	case key.Matches(msg, keyField):
 		if d.mode == dialogAdd {
 			return d.switchField()
 		}
 		return nil
-	case "enter":
+	case key.Matches(msg, listedit.KeyAccept):
 		if d.mode == dialogAdd && !d.onValue {
 			return d.switchField()
 		}

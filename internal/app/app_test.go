@@ -607,3 +607,28 @@ func TestConfigListsOverrideGuesses(t *testing.T) {
 		t.Error("listNames lacks my_dirs")
 	}
 }
+
+// The review scrolls when the changes do not fit, rather than cutting them off.
+func TestReviewScrolls(t *testing.T) {
+	vars := map[string]string{}
+	for i := range 40 {
+		vars[fmt.Sprintf("V%02d", i)] = "1"
+	}
+	st, _ := fakeStore(vars, nil)
+	m := sized(testModel(t, st), 100, 20)
+	m = press(m, "enter")
+	for range 40 {
+		m = press(m, "d", "j")
+	}
+	m = press(m, "s")
+	if !strings.Contains(screen(m), "- V00") || strings.Contains(screen(m), "- V39") || !strings.Contains(screen(m), "scroll") {
+		t.Fatalf("the top of the review:\n%s", screen(m))
+	}
+	for range 40 {
+		next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+		m = next.(frame.Model)
+	}
+	if !strings.Contains(screen(m), "- V39") {
+		t.Fatalf("scrolled down, the last change is not there:\n%s", screen(m))
+	}
+}

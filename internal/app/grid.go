@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/EnderWolf50/enved/listedit"
 	"github.com/EnderWolf50/enved/theme"
 )
 
@@ -87,11 +88,11 @@ func (g *grid) point(i int) {
 // updateFilter takes a key while the filter is being typed; changed says the table must
 // narrow again.
 func (g *grid) updateFilter(msg tea.KeyPressMsg) (cmd tea.Cmd, changed bool) {
-	switch msg.String() {
-	case "enter":
+	switch {
+	case key.Matches(msg, listedit.KeyFilterKeep):
 		g.filter.Blur()
 		return nil, false
-	case "esc":
+	case key.Matches(msg, listedit.KeyFilterClear):
 		g.filter.Blur()
 		g.filter.SetValue("")
 		return nil, true
@@ -108,10 +109,7 @@ func (g *grid) footer(groups ...[]key.Binding) string {
 	g.table.SetHeight(max(g.h-gridChrome-len(lines), 1))
 	if g.filter.Focused() {
 		n := len(lines)
-		lines = theme.HelpLines(g.help, g.w, []key.Binding{
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
-		})
+		lines = theme.HelpLines(g.help, g.w, []key.Binding{listedit.KeyFilterKeep, listedit.KeyFilterClear})
 		for len(lines) < n {
 			lines = append(lines, "")
 		}

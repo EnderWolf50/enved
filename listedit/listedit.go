@@ -74,6 +74,14 @@ var (
 	keyBack   = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
+// The keys of a dialog and of a filter being typed, which the program's own use too.
+var (
+	KeyAccept      = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep"))
+	KeyCancel      = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+	KeyFilterKeep  = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter"))
+	KeyFilterClear = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter"))
+)
+
 // Model is one list being edited.
 type Model struct {
 	Title    string // the heading: "User PATH", "User › PSModulePath"
@@ -384,11 +392,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, Event) {
 
 // Typing a filter: the table narrows as you type; enter keeps it, esc drops it.
 func (m *Model) updateFilter(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "enter":
+	switch {
+	case key.Matches(msg, KeyFilterKeep):
 		m.filter.Blur()
 		return nil
-	case "esc":
+	case key.Matches(msg, KeyFilterClear):
 		m.filter.Blur()
 		m.filter.SetValue("")
 		m.refresh()
@@ -624,10 +632,7 @@ func (m *Model) footer() string {
 	m.table.SetHeight(max(m.h-chrome-len(lines), 1))
 	if m.filter.Focused() {
 		n := len(lines)
-		lines = theme.HelpLines(m.help, m.w, []key.Binding{
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
-		})
+		lines = theme.HelpLines(m.help, m.w, []key.Binding{KeyFilterKeep, KeyFilterClear})
 		for len(lines) < n {
 			lines = append(lines, "")
 		}

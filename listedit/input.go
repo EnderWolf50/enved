@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
@@ -67,17 +68,17 @@ func (m *Model) Overlay() string {
 		}
 	}
 	return theme.Dialog.Render(theme.Accent.Render(title) + "\n\n" + b.field.View() + "\n\n" + check +
-		"\n\n" + theme.Dim.Render("enter keep · esc cancel"))
+		"\n\n" + m.help.ShortHelpView([]key.Binding{KeyAccept, KeyCancel}))
 }
 
 // The input box: only its own keys count while it is open.
 func (m *Model) updateInput(msg tea.KeyPressMsg) tea.Cmd {
 	b := m.input
-	switch msg.String() {
-	case "esc":
+	switch {
+	case key.Matches(msg, KeyCancel):
 		m.input = nil
 		return nil
-	case "enter":
+	case key.Matches(msg, KeyAccept):
 		m.input = nil
 		v := m.kind.normalize(b.field.Value())
 		if v == "" {

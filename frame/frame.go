@@ -9,6 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -76,11 +79,14 @@ type Model struct {
 	confirmSave bool     // the review holds warnings: enter was pressed once
 	saving      bool     // the save is running (UAC may be asking)
 	outcome     []string // what the save did, shown on the review screen afterwards
+
+	review viewport.Model // the review's lines, scrolled
+	help   help.Model
 }
 
 // New is the screen over tabs, with the sidebar on tab on; open puts the keys in its body.
 func New(opts Options, tabs []Tab, on int, open bool) Model {
-	m := Model{opts: opts, tabs: tabs, saveErr: make([]error, len(tabs)), on: on}
+	m := Model{opts: opts, tabs: tabs, saveErr: make([]error, len(tabs)), on: on, review: newReview(), help: help.New()}
 	if open {
 		m.inBody = true
 		m.tab().Focus(true)
@@ -134,12 +140,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.resize()
+		m.syncReview()
 		return m, nil
 	case savedMsg:
 		return m.saved(msg)
 	case tea.KeyPressMsg:
 		m.status = ""
-		if msg.String() == "ctrl+c" {
+		if key.Matches(msg, keyForceQuit) {
 			return m, tea.Quit
 		}
 		switch {
@@ -178,22 +185,22 @@ func (m Model) anyDirty() bool {
 
 // The sidebar picks a tab; enter hands the keys to its body.
 func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "esc":
+	switch {
+	case key.Matches(msg, keyQuit):
 		if m.anyDirty() {
 			m.confirmQuit = true
 			return m, nil
 		}
 		return m, tea.Quit
-	case "s":
+	case key.Matches(msg, keySave):
 		return m.startReview()
-	case "R":
+	case key.Matches(msg, keyReload):
 		return m.reload()
-	case "up", "k":
+	case key.Matches(msg, keyUp):
 		m.on = max(m.on-1, 0)
-	case "down", "j":
+	case key.Matches(msg, keyDown):
 		m.on = min(m.on+1, len(m.tabs)-1)
-	case "enter", "right", "l":
+	case key.Matches(msg, keyOpen):
 		m.inBody = true
 		m.tab().Focus(true)
 	}
@@ -280,10 +287,10 @@ func (m Model) viewMain() string {
 	// While it has focus, the sidebar keeps its keys at the bottom. (The filler string adds
 	// one line more than its newlines.)
 	if !m.inBody {
-		foot := []string{"↑/k      up", "↓/j      down", "→/enter  open", "R        reload", "s        save", "esc/q    quit"}
+		foot := m.help.FullHelpView([][]key.Binding{{keyUp, keyDown, keyOpen, keyReload, keySave, keyQuit}})
 		inner := m.h - sideStyle.GetVerticalFrameSize()
-		side = append(side, strings.Repeat("\n", max(inner-len(side)-len(foot)-1, 0)))
-		side = append(side, theme.Dim.Render(strings.Join(foot, "\n")))
+		side = append(side, strings.Repeat("\n", max(inner-len(side)-lipgloss.Height(foot)-1, 0)))
+		side = append(side, foot)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top,
 		sideStyle.Width(sideW).Height(m.h).Render(strings.Join(side, "\n")),
@@ -321,15 +328,15 @@ func (m Model) quitDialog() string {
 	}
 	return theme.Modal.Render(lipgloss.JoinVertical(lipgloss.Center,
 		theme.Err.Bold(true).Render("Quit without saving?"), "", theme.Plural(n, "change", "changes")+" will be lost.", "",
-		theme.Dim.Render("y/q quit · n/esc stay")))
+		m.help.ShortHelpView([]key.Binding{keyQuitYes, keyQuitNo})))
 }
 
 // The quit dialog only answers the question; every other key is ignored while it is open.
 func (m Model) updateQuit(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "y", "q":
+	switch {
+	case key.Matches(msg, keyQuitYes):
 		return m, tea.Quit
-	case "n", "esc":
+	case key.Matches(msg, keyQuitNo):
 		m.confirmQuit = false
 	}
 	return m, nil
@@ -343,6 +350,8 @@ func (m Model) startReview() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.reviewing, m.confirmSave, m.outcome = true, false, nil
+	m.syncReview()
+	m.review.GotoTop()
 	return m, nil
 }
 
@@ -380,29 +389,46 @@ func (m Model) reviewLines(width int) []string {
 	return lines
 }
 
+// reviewSize is the review's scrolling area: the panel less the title, a blank, a blank and
+// the help.
+func (m Model) reviewSize() (w, h int) {
+	return max(m.w-theme.Panel.GetHorizontalFrameSize(), 0), max(m.h-theme.Panel.GetVerticalFrameSize()-4, 1)
+}
+
+// syncReview fills the scrolling area with what is to be shown: the changes, or the outcome
+// of the save.
+func (m *Model) syncReview() {
+	w, h := m.reviewSize()
+	m.review.SetWidth(w)
+	m.review.SetHeight(h)
+	lines := m.outcome
+	if lines == nil {
+		lines = m.reviewLines(w)
+	}
+	m.review.SetContent(strings.Join(lines, "\n"))
+}
+
 func (m Model) viewReview() string {
-	width := m.w - theme.Panel.GetHorizontalFrameSize()
 	title := theme.Accent.Render("Review") + theme.Dim.Render(" · what saving will write")
-	lines, help := m.reviewLines(width), "enter/s save · esc/q back to the list"
+	keys := []key.Binding{keyReviewSave, keyReviewBack}
+	note := ""
 	if len(m.warnings()) > 0 {
-		help = "enter/s save (it asks again: the changes marked ! need a second look) · esc/q back"
+		note = theme.Dim.Render("it asks again: the changes marked ! need a second look · ")
 	}
 	switch {
 	case m.saving:
-		title, help = theme.Accent.Render("Saving…"), "answer the UAC prompt if one opened"
+		title, keys, note = theme.Accent.Render("Saving…"), nil, theme.Dim.Render("answer the UAC prompt if one opened")
 	case m.outcome != nil:
-		title, lines, help = theme.Accent.Render("Saved"), m.outcome, "enter/esc back to the list · q quit"
+		title, keys, note = theme.Accent.Render("Saved"), []key.Binding{keyDoneBack, keyDoneQuit}, ""
 	case m.confirmSave:
-		help = theme.Err.Render("Save the changes marked ! as well? enter/y save · esc/n back")
+		keys, note = []key.Binding{keySureYes, keySureNo}, theme.Err.Render("Save the changes marked ! as well? ")
 	}
-	room := max(m.h-theme.Panel.GetVerticalFrameSize()-4, 1)
-	if len(lines) > room {
-		more := len(lines) - room + 1
-		lines = append(lines[:room-1], theme.Dim.Render(fmt.Sprintf("… and %d more lines", more)))
+	if m.review.TotalLineCount() > m.review.Height() {
+		keys = append([]key.Binding{keyScroll}, keys...)
 	}
-	body := title + "\n\n" + strings.Join(lines, "\n")
 	inner := m.h - theme.Panel.GetVerticalFrameSize()
-	body += strings.Repeat("\n", max(inner-lipgloss.Height(body), 1)) + theme.Dim.Render(help)
+	body := title + "\n\n" + m.review.View()
+	body += strings.Repeat("\n", max(inner-lipgloss.Height(body), 1)) + note + m.help.ShortHelpView(keys)
 	return theme.Panel.BorderForeground(theme.ColorAccent).Width(m.w).Height(m.h).Render(body)
 }
 
@@ -410,35 +436,38 @@ func (m Model) updateReview(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.saving {
 		return m, nil // nothing to do but wait
 	}
-	if m.outcome != nil {
-		switch msg.String() {
-		case "q":
+	switch {
+	case m.outcome != nil:
+		switch {
+		case key.Matches(msg, keyDoneQuit):
 			return m, tea.Quit
-		case "enter", "esc":
+		case key.Matches(msg, keyDoneBack):
 			m.reviewing, m.outcome = false, nil
+			return m, nil
 		}
-		return m, nil
-	}
-	if m.confirmSave {
-		switch msg.String() {
-		case "enter", "y":
+	case m.confirmSave:
+		switch {
+		case key.Matches(msg, keySureYes):
 			return m.save()
-		case "esc", "n", "q":
+		case key.Matches(msg, keySureNo):
 			m.confirmSave = false
 		}
 		return m, nil
-	}
-	switch msg.String() {
-	case "enter", "s":
+	case key.Matches(msg, keyReviewSave):
 		if len(m.warnings()) > 0 {
 			m.confirmSave = true
 			return m, nil
 		}
 		return m.save()
-	case "esc", "q", "left", "h":
+	case key.Matches(msg, keyReviewBack):
 		m.reviewing = false
+		return m, nil
 	}
-	return m, nil
+	// Any other key may scroll.
+	m.syncReview()
+	var cmd tea.Cmd
+	m.review, cmd = m.review.Update(msg)
+	return m, cmd
 }
 
 // savedMsg brings back how each write went: an error per tab, nil when it was saved.
@@ -488,5 +517,7 @@ func (m Model) saved(msg savedMsg) (tea.Model, tea.Cmd) {
 	if m.opts.AfterSave != "" {
 		m.outcome = append(m.outcome, "", theme.Dim.Render(m.opts.AfterSave))
 	}
+	m.syncReview()
+	m.review.GotoTop()
 	return m, nil
 }
