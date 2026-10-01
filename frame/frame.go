@@ -199,13 +199,13 @@ func (m Model) updateSide(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, tea.Quit
-	case key.Matches(msg, keySave):
+	case key.Matches(msg, KeySave):
 		return m.startReview()
-	case key.Matches(msg, keyReload):
+	case key.Matches(msg, KeyReload):
 		return m.reload()
-	case key.Matches(msg, keyUp):
+	case key.Matches(msg, KeyUp):
 		m.on = max(m.on-1, 0)
-	case key.Matches(msg, keyDown):
+	case key.Matches(msg, KeyDown):
 		m.on = min(m.on+1, len(m.tabs)-1)
 	case key.Matches(msg, keyOpen):
 		m.inBody = true
@@ -295,7 +295,7 @@ func (m Model) viewMain() string {
 	// While it has focus, the sidebar keeps its keys at the bottom. (The filler string adds
 	// one line more than its newlines.)
 	if !m.inBody {
-		foot := m.help.FullHelpView([][]key.Binding{{keyUp, keyDown, keyOpen, keyReload, keySave, keyQuit}})
+		foot := m.help.FullHelpView([][]key.Binding{{KeyUp, KeyDown, keyOpen, KeyReload, KeySave, keyQuit}})
 		inner := m.h - sideStyle.GetVerticalFrameSize()
 		side = append(side, strings.Repeat("\n", max(inner-len(side)-lipgloss.Height(foot)-1, 0)))
 		side = append(side, foot)

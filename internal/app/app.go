@@ -16,6 +16,7 @@ import (
 
 	"github.com/EnderWolf50/enved/elevate"
 	"github.com/EnderWolf50/enved/frame"
+	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
 )
 
@@ -103,7 +104,7 @@ func runAs(prog string, args []string, st winenv.Store) error {
 		case "--front":
 			f.front = true
 		case "-h", "--help", "help":
-			fmt.Println(pick(prog == "pathed", pathedUsage, usage))
+			fmt.Println(theme.Pick(prog == "pathed", pathedUsage, usage))
 			return nil
 		case "-v", "--version":
 			fmt.Println(prog, versionString())
@@ -203,7 +204,7 @@ func set(st winenv.Store, f flags, name, value string) error {
 	if err != nil {
 		return err
 	}
-	typ := pick(strings.Contains(value, "%"), winenv.ExpandSZ, winenv.SZ)
+	typ := theme.Pick(strings.Contains(value, "%"), winenv.ExpandSZ, winenv.SZ)
 	if exists {
 		typ, name = old.Type, old.Name // keep its type and the case of its name
 	}

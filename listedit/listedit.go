@@ -5,6 +5,7 @@ package listedit
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -47,22 +48,13 @@ func (e *entry) change() theme.Change {
 }
 
 var (
-	keyUp     = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	keyDown   = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
 	keyMoveUp = key.NewBinding(key.WithKeys("K", "shift+up"), key.WithHelp("K/J", "move"))
 	keyMoveDn = key.NewBinding(key.WithKeys("J", "shift+down"))
 	keyAppend = key.NewBinding(key.WithKeys("a"), key.WithHelp("a/i", "add after/before"))
 	keyInsert = key.NewBinding(key.WithKeys("i"))
 	keyEdit   = key.NewBinding(key.WithKeys("enter", "e"), key.WithHelp("enter/e", "edit"))
-	keyRemove = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
 	keyClean  = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clean"))
-	keyUndo   = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo"))
-	keyRedo   = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
 	keyOpen   = key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open"))
-	keyFilter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	keyReload = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
-	keySave   = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
-	keyBack   = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
 // The keys of a dialog and of a filter being typed, which the program's own use too.
@@ -210,7 +202,7 @@ func (m *Model) Changes() (added, edited, removed int) {
 // Pending is the number of changes, a new order counting as one.
 func (m *Model) Pending() int {
 	a, e, r := m.Changes()
-	return a + e + r + pick(m.Reordered(), 1, 0)
+	return a + e + r + theme.Pick(m.Reordered(), 1, 0)
 }
 
 // Reordered says whether the entries kept from the last save are in another order.
@@ -330,7 +322,7 @@ func (m *Model) redraw() {
 	for row, i := range m.shown {
 		e := m.entries[i]
 		onCursor := row == cursor && m.focused
-		r := theme.NewRow(e.change(), pick(!e.removed && (problem[i] != "" || dupOf[i] > 0), theme.Problem, theme.NoNote), onCursor)
+		r := theme.NewRow(e.change(), theme.Pick(!e.removed && (problem[i] != "" || dupOf[i] > 0), theme.Problem, theme.NoNote), onCursor)
 		plain := lipgloss.NewStyle()
 		value, state := r.Paint(plain, e.value), r.Paint(theme.OK, "ok")
 		switch {
@@ -416,18 +408,18 @@ func (m *Model) Redo() bool { return m.step(&m.future, &m.history) }
 func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	e, i, ok := m.current()
 	switch {
-	case key.Matches(msg, keyBack): // one level up: first out of a filter, then out
+	case key.Matches(msg, frame.KeyBack): // one level up: first out of a filter, then out
 		if m.filter.Value() != "" {
 			m.filter.SetValue("")
 			m.refresh()
 			return nil, frame.None
 		}
 		return nil, frame.Back
-	case key.Matches(msg, keySave):
+	case key.Matches(msg, frame.KeySave):
 		return nil, frame.Save
-	case key.Matches(msg, keyReload):
+	case key.Matches(msg, frame.KeyReload):
 		return nil, frame.Reload
-	case key.Matches(msg, keyFilter):
+	case key.Matches(msg, frame.KeyFilter):
 		return m.filter.Focus(), frame.None
 	case key.Matches(msg, keyOpen):
 		if ok && m.kind.onDisk() {
@@ -442,7 +434,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if ok && m.editable() {
 			return m.openInput(i, false), frame.None
 		}
-	case key.Matches(msg, keyRemove):
+	case key.Matches(msg, frame.KeyRemove):
 		if ok && m.editable() {
 			m.remember()
 			if e.added() { // never saved: nothing to keep around
@@ -459,7 +451,7 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		case m.filter.Value() != "":
 			m.status = "clear the filter (esc) to reorder"
 		default:
-			to := i + pick(key.Matches(msg, keyMoveDn), 1, -1)
+			to := i + theme.Pick(key.Matches(msg, keyMoveDn), 1, -1)
 			if to >= 0 && to < len(m.entries) {
 				m.remember()
 				m.entries[i], m.entries[to] = m.entries[to], m.entries[i]
@@ -471,13 +463,13 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if m.editable() {
 			m.status = fmt.Sprintf("clean: %s marked for removal", theme.Plural(m.Clean(), "entry", "entries"))
 		}
-	case key.Matches(msg, keyUndo):
+	case key.Matches(msg, frame.KeyUndo):
 		if m.editable() {
-			m.status = pick(m.Undo(), "undone", "nothing to undo")
+			m.status = theme.Pick(m.Undo(), "undone", "nothing to undo")
 		}
-	case key.Matches(msg, keyRedo):
+	case key.Matches(msg, frame.KeyRedo):
 		if m.editable() {
-			m.status = pick(m.Redo(), "redone", "nothing to redo")
+			m.status = theme.Pick(m.Redo(), "redone", "nothing to redo")
 		}
 	default:
 		var cmd tea.Cmd
@@ -490,18 +482,11 @@ func (m *Model) updateList(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 
 // open shows a folder in Explorer, or a file selected in its folder.
 func open(path string) {
-	if fi, err := statDir(path); err == nil && !fi {
+	if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
 		exec.Command("explorer", "/select,"+path).Start()
 		return
 	}
 	exec.Command("explorer", path).Start()
-}
-
-func pick[T any](cond bool, a, b T) T {
-	if cond {
-		return a
-	}
-	return b
 }
 
 var windowsAbs = regexp.MustCompile(`^([A-Za-z]:[\\/]|\\\\)`)
@@ -535,7 +520,7 @@ func (m *Model) Heading() string {
 	}
 	h := theme.Accent.Render(m.Title) + theme.Dim.Render(" · "+theme.Plural(len(m.Result()), "entry", "entries"))
 	if nBad > 0 {
-		h += theme.Err.Render(fmt.Sprintf(" · %d %s", nBad, pick(m.kind == Extensions, "not extensions", "missing")))
+		h += theme.Err.Render(fmt.Sprintf(" · %d %s", nBad, theme.Pick(m.kind == Extensions, "not extensions", "missing")))
 	}
 	if nDup > 0 {
 		h += theme.Warn.Render(" · " + theme.Plural(nDup, "duplicate", "duplicates"))
@@ -609,13 +594,13 @@ func (m *Model) Body() string {
 // footer is the help under the table: groups of related keys, over as many lines as they
 // need, which the table gives up. While the filter is typed its own keys take those lines.
 func (m *Model) footer() string {
-	edit := []key.Binding{keyEdit, keyAppend, keyRemove, keyMoveUp, keyClean}
+	edit := []key.Binding{keyEdit, keyAppend, frame.KeyRemove, keyMoveUp, keyClean}
 	if m.kind.onDisk() {
 		edit = append(edit, keyOpen)
 	}
-	groups := [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}, edit, {keyUndo, keyRedo, keySave, keyReload}}
+	groups := [][]key.Binding{{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack}, edit, {frame.KeyUndo, frame.KeyRedo, frame.KeySave, frame.KeyReload}}
 	if m.ReadOnly {
-		groups = [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}}
+		groups = [][]key.Binding{{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack}}
 	}
 	lines := theme.HelpLines(m.help, m.w, groups...)
 	m.table.SetHeight(max(m.h-chrome-len(lines), 1))

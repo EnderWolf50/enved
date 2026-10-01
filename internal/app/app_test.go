@@ -13,6 +13,7 @@ import (
 
 	"github.com/EnderWolf50/enved/elevate"
 	"github.com/EnderWolf50/enved/frame"
+	"github.com/EnderWolf50/enved/theme"
 	"github.com/EnderWolf50/enved/winenv"
 )
 
@@ -22,7 +23,7 @@ func fakeStore(user, machine map[string]string) (winenv.Store, map[winenv.Scope]
 	saved := map[winenv.Scope]map[string]winenv.Value{winenv.User: {}, winenv.Machine: {}}
 	for s, vars := range map[winenv.Scope]map[string]string{winenv.User: user, winenv.Machine: machine} {
 		for n, v := range vars {
-			saved[s][n] = winenv.Value{Data: v, Type: pick(strings.Contains(v, "%"), winenv.ExpandSZ, winenv.SZ)}
+			saved[s][n] = winenv.Value{Data: v, Type: theme.Pick(strings.Contains(v, "%"), winenv.ExpandSZ, winenv.SZ)}
 		}
 	}
 	lookup := func(s winenv.Scope, name string) (string, bool) {

@@ -78,11 +78,7 @@ func (k Kind) Health(entries []string, exists func(string) bool) (problem []stri
 // problem is what is wrong with an entry on its own, or "".
 func (k Kind) problem(e string, exists func(string) bool) string {
 	switch k {
-	case Folders:
-		if !exists(e) {
-			return "missing"
-		}
-	case Paths:
+	case Folders, Paths:
 		if !exists(e) {
 			return "missing"
 		}

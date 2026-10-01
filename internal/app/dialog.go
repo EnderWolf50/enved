@@ -174,7 +174,7 @@ func (t *varTab) keep(d *varDialog) {
 	t.remember()
 	switch d.mode {
 	case dialogAdd:
-		typ := pick(strings.Contains(d.value.Value(), "%"), winenv.ExpandSZ, winenv.SZ)
+		typ := theme.Pick(strings.Contains(d.value.Value(), "%"), winenv.ExpandSZ, winenv.SZ)
 		v = &variable{name: d.name.Value(), value: winenv.Value{Data: d.value.Value(), Type: typ}}
 		at, _ := slices.BinarySearchFunc(t.vars, v, func(a, b *variable) int {
 			return strings.Compare(winenv.Key(a.name), winenv.Key(b.name))

@@ -96,11 +96,15 @@ var (
 // Ordered puts removals first, so a rename (a removal and an add) that only changes the
 // case of a name frees the name before it is written again.
 func Ordered(changes []Change) []Change {
-	out := slices.Clone(changes)
-	slices.SortStableFunc(out, func(a, b Change) int {
-		return cmp.Compare(pick(a.New == nil, 0, 1), pick(b.New == nil, 0, 1))
-	})
-	return out
+	var removals, rest []Change
+	for _, c := range changes {
+		if c.New == nil {
+			removals = append(removals, c)
+		} else {
+			rest = append(rest, c)
+		}
+	}
+	return append(removals, rest...)
 }
 
 // Check goes through ordered changes as if writing them, starting from the values current
@@ -193,11 +197,4 @@ func backup(s Scope, name string, v Value) error {
 	}, name)
 	file := fmt.Sprintf("%s-%s-%s.txt", s, safe, time.Now().Format("20060102-150405.000"))
 	return os.WriteFile(filepath.Join(dir, file), []byte(v.Data), 0o644)
-}
-
-func pick[T any](cond bool, a, b T) T {
-	if cond {
-		return a
-	}
-	return b
 }

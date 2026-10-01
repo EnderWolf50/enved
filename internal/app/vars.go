@@ -18,23 +18,14 @@ import (
 )
 
 var (
-	keyUp       = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
-	keyDown     = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
 	keyAdd      = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add"))
 	keyEdit     = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit"))
 	keyText     = key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit as text"))
 	keyRename   = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "rename"))
-	keyRemove   = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "remove"))
 	keyType     = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "%expand"))
 	keyList     = key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "list on/off"))
 	keyCopy     = key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "copy value"))
 	keyCopyName = key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "copy name"))
-	keyUndo     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "undo"))
-	keyRedo     = key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "redo"))
-	keyFilter   = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	keyReload   = key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "reload"))
-	keySave     = key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "save"))
-	keyBack     = key.NewBinding(key.WithKeys("left", "h", "esc", "q"), key.WithHelp("←/h/esc/q", "back"))
 )
 
 // varTab is one scope's variables: the table, and the list editor of one of them when open.
@@ -109,15 +100,19 @@ func (t *varTab) step(from, to *[][]varState) bool {
 // history1 is u or z.
 func (t *varTab) history1(k tea.KeyPressMsg) {
 	switch {
-	case key.Matches(k, keyUndo):
+	case key.Matches(k, frame.KeyUndo):
 		t.undo()
 	default:
 		t.redo()
 	}
 }
 
-func (t *varTab) undo() { t.status = pick(t.step(&t.history, &t.future), "undone", "nothing to undo") }
-func (t *varTab) redo() { t.status = pick(t.step(&t.future, &t.history), "redone", "nothing to redo") }
+func (t *varTab) undo() {
+	t.status = theme.Pick(t.step(&t.history, &t.future), "undone", "nothing to undo")
+}
+func (t *varTab) redo() {
+	t.status = theme.Pick(t.step(&t.future, &t.history), "redone", "nothing to redo")
+}
 
 func newVarTab(s winenv.Scope, st winenv.Store, prefs *listPrefs) *varTab {
 	t := &varTab{scope: s, st: st, prefs: prefs, grid: newGrid()}
@@ -204,7 +199,7 @@ func (t *varTab) redraw() {
 	cols := t.table.Columns()
 	t.paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
-		r := theme.NewRow(v.change(), pick(isSystem(v.name), theme.Info, theme.NoNote), cursor)
+		r := theme.NewRow(v.change(), theme.Pick(isSystem(v.name), theme.Info, theme.NoNote), cursor)
 		plain := lipgloss.NewStyle()
 		name, value := r.Paint(plain, v.name), r.Paint(plain, t.shownValue(v))
 		if v.removed {
@@ -218,7 +213,7 @@ func (t *varTab) redraw() {
 			kind = append(kind, "sys")
 		}
 		return r.Cells(cols, r.Mark(v.change(), cursor), name, value,
-			r.Paint(theme.Accent, pick(v.current().Expands(), "%", " ")), r.Paint(theme.Warn, strings.Join(kind, " ")))
+			r.Paint(theme.Accent, theme.Pick(v.current().Expands(), "%", " ")), r.Paint(theme.Warn, strings.Join(kind, " ")))
 	})
 }
 
@@ -273,7 +268,7 @@ func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 	if t.open != nil {
 		// u, U and z in the list editor work on the scope's history, which covers the table
 		// and every list.
-		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, keyUndo, keyRedo) && !t.open.list.Busy() {
+		if k, ok := msg.(tea.KeyPressMsg); ok && key.Matches(k, frame.KeyUndo, frame.KeyRedo) && !t.open.list.Busy() {
 			t.status = ""
 			t.history1(k)
 			return nil, frame.None
@@ -316,18 +311,18 @@ func (t *varTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 	v, _ := t.current()
 	switch {
-	case key.Matches(msg, keyBack):
+	case key.Matches(msg, frame.KeyBack):
 		if t.filter.Value() != "" {
 			t.filter.SetValue("")
 			t.refresh()
 			return nil, frame.None
 		}
 		return nil, frame.Back
-	case key.Matches(msg, keySave):
+	case key.Matches(msg, frame.KeySave):
 		return nil, frame.Save
-	case key.Matches(msg, keyReload):
+	case key.Matches(msg, frame.KeyReload):
 		return nil, frame.Reload
-	case key.Matches(msg, keyFilter):
+	case key.Matches(msg, frame.KeyFilter):
 		return t.filter.Focus(), frame.None
 	case key.Matches(msg, keyCopy):
 		if v != nil {
@@ -358,7 +353,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if v != nil && !v.removed && t.editable() {
 			return t.openDialog(dialogName, v), frame.None
 		}
-	case key.Matches(msg, keyRemove):
+	case key.Matches(msg, frame.KeyRemove):
 		if v != nil && t.editable() {
 			if v.removed && t.find(v.name, v) != nil {
 				t.status = "another variable is named " + v.name + " now"
@@ -378,7 +373,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 			t.remember()
 			v.fold()
 			v.typeSet = true
-			v.value.Type = pick(v.value.Expands(), winenv.SZ, winenv.ExpandSZ)
+			v.value.Type = theme.Pick(v.value.Expands(), winenv.SZ, winenv.ExpandSZ)
 			if !v.value.Expands() && strings.Contains(v.value.Data, "%") {
 				t.status = "REG_SZ: its %VARS% stay as they are"
 			}
@@ -388,7 +383,7 @@ func (t *varTab) updateTable(msg tea.KeyPressMsg) (tea.Cmd, frame.Event) {
 		if v != nil {
 			t.toggleList(v)
 		}
-	case key.Matches(msg, keyUndo, keyRedo):
+	case key.Matches(msg, frame.KeyUndo, frame.KeyRedo):
 		t.history1(msg)
 	default:
 		var cmd tea.Cmd
@@ -519,11 +514,11 @@ func (t *varTab) Body() string {
 	}
 
 	help := t.footer(
-		[]key.Binding{keyUp, keyDown, keyFilter, keyBack},
-		[]key.Binding{keyEdit, keyText, keyAdd, keyRename, keyRemove},
+		[]key.Binding{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack},
+		[]key.Binding{keyEdit, keyText, keyAdd, keyRename, frame.KeyRemove},
 		[]key.Binding{keyType, keyList},
 		[]key.Binding{keyCopyName, keyCopy},
-		[]key.Binding{keyUndo, keyRedo, keySave, keyReload})
+		[]key.Binding{frame.KeyUndo, frame.KeyRedo, frame.KeySave, frame.KeyReload})
 	body := t.table.View()
 	if len(t.shown) == 0 {
 		note := "no variables · a adds one"
@@ -539,11 +534,4 @@ func (t *varTab) Body() string {
 		strings.Join(detail, "\n"),
 		help,
 	}, "\n")
-}
-
-func pick[T any](cond bool, a, b T) T {
-	if cond {
-		return a
-	}
-	return b
 }

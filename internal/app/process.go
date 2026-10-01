@@ -123,8 +123,8 @@ func (t *processTab) redraw() {
 	t.paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
 		state := t.state(v)
-		r := theme.NewRow(theme.Unchanged, pick(state == "stale", theme.Info, theme.NoNote), cursor)
-		style := pick(state == "stale", theme.Warn, theme.Dim)
+		r := theme.NewRow(theme.Unchanged, theme.Pick(state == "stale", theme.Info, theme.NoNote), cursor)
+		style := theme.Pick(state == "stale", theme.Warn, theme.Dim)
 		return r.Cells(cols, r.Mark(theme.Unchanged, cursor), r.Paint(lipgloss.NewStyle(), v.Name),
 			r.Paint(lipgloss.NewStyle(), v.Data), r.Paint(style, state))
 	})
@@ -146,18 +146,18 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 		return cmd, frame.None
 	}
 	switch {
-	case key.Matches(k, keyBack):
+	case key.Matches(k, frame.KeyBack):
 		if t.filter.Value() != "" {
 			t.filter.SetValue("")
 			t.refresh()
 			return nil, frame.None
 		}
 		return nil, frame.Back
-	case key.Matches(k, keyFilter):
+	case key.Matches(k, frame.KeyFilter):
 		return t.filter.Focus(), frame.None
-	case key.Matches(k, keyReload):
+	case key.Matches(k, frame.KeyReload):
 		return nil, frame.Reload
-	case key.Matches(k, keySave):
+	case key.Matches(k, frame.KeySave):
 		return nil, frame.Save
 	case key.Matches(k, keyCopy, keyCopyName):
 		if i := t.current(); i >= 0 {
@@ -170,7 +170,7 @@ func (t *processTab) Update(msg tea.Msg) (tea.Cmd, frame.Event) {
 			return tea.SetClipboard(v.Data), frame.None
 		}
 		return nil, frame.None
-	case key.Matches(k, keyAdd, keyEdit, keyText, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo):
+	case key.Matches(k, keyAdd, keyEdit, keyText, frame.KeyRemove, keyRename, keyType, keyList, frame.KeyUndo, frame.KeyRedo):
 		t.status = "this process's environment is read-only"
 		return nil, frame.None
 	}
@@ -214,9 +214,9 @@ func (t *processTab) Body() string {
 		detail[i] = ansi.Truncate(detail[i], width, "…")
 	}
 	help := t.footer(
-		[]key.Binding{keyUp, keyDown, keyFilter, keyBack},
+		[]key.Binding{frame.KeyUp, frame.KeyDown, frame.KeyFilter, frame.KeyBack},
 		[]key.Binding{keyCopyName, keyCopy},
-		[]key.Binding{keyReload})
+		[]key.Binding{frame.KeyReload})
 	return strings.Join([]string{
 		t.filterLine(),
 		t.table.View(), "",

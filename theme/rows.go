@@ -46,15 +46,15 @@ func NewRow(c Change, note Note, cursor bool) Row {
 	var bg lipgloss.Style
 	switch {
 	case c == Removed:
-		bg = bg.Background(pick(cursor, bgRemovedCursor, bgRemoved))
+		bg = bg.Background(Pick(cursor, bgRemovedCursor, bgRemoved))
 	case c == Added:
-		bg = bg.Background(pick(cursor, bgAddedCursor, bgAdded))
+		bg = bg.Background(Pick(cursor, bgAddedCursor, bgAdded))
 	case c == Edited:
-		bg = bg.Background(pick(cursor, bgEditedCursor, bgEdited))
+		bg = bg.Background(Pick(cursor, bgEditedCursor, bgEdited))
 	case note == Info:
-		bg = bg.Background(pick(cursor, bgNoteCursor, bgNote))
+		bg = bg.Background(Pick(cursor, bgNoteCursor, bgNote))
 	case note == Problem:
-		bg = bg.Background(pick(cursor, bgProblemCursor, bgProblem))
+		bg = bg.Background(Pick(cursor, bgProblemCursor, bgProblem))
 	case cursor:
 		bg = bg.Background(bgCursor)
 	}
@@ -116,7 +116,8 @@ func Divider(width int, legend string) string {
 	return Faint.Render(strings.Repeat("─", width-lw-4)+" ") + legend + Faint.Render(" ──")
 }
 
-func pick[T any](cond bool, a, b T) T {
+// Pick is a if cond, else b.
+func Pick[T any](cond bool, a, b T) T {
 	if cond {
 		return a
 	}

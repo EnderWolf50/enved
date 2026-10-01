@@ -2,7 +2,6 @@ package listedit
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -24,7 +23,7 @@ type inputBox struct {
 // openAdd asks for a new entry next to the one under the cursor (i, -1 for none): after it
 // (a, append) or before it (i, insert).
 func (m *Model) openAdd(i int, before bool) tea.Cmd {
-	return m.openInput(pick(before, max(i, 0), i+1), true)
+	return m.openInput(theme.Pick(before, max(i, 0), i+1), true)
 }
 
 func (m *Model) openInput(at int, adding bool) tea.Cmd {
@@ -53,7 +52,7 @@ func (m *Model) Overlay() string {
 	v := m.kind.normalize(b.field.Value())
 	check := theme.Dim.Render("type " + m.kind.placeholder())
 	if v != "" {
-		check = theme.OK.Render(pick(m.kind.fine() != "", m.kind.fine(), "ok"))
+		check = theme.OK.Render(theme.Pick(m.kind.fine() != "", m.kind.fine(), "ok"))
 		if p := m.kind.problem(v, m.exists); p != "" {
 			check = theme.Err.Render(m.kind.explain(p) + " (it can still be added)")
 		}
@@ -112,13 +111,4 @@ func (m *Model) updateInput(msg tea.KeyPressMsg) tea.Cmd {
 	var cmd tea.Cmd
 	b.field, cmd = b.field.Update(msg)
 	return cmd
-}
-
-// statDir says whether path is a folder.
-func statDir(path string) (bool, error) {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return false, err
-	}
-	return fi.IsDir(), nil
 }
