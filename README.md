@@ -62,7 +62,8 @@ red and struck through. An unchanged row worth a look gets a light tint: blue-gr
 fact to keep in mind (a system variable; in Process, a stale value), violet for a problem
 (in a list, a missing folder, a bad extension or a duplicate). The divider under the table
 carries the key to these colors, and the keys under it come in groups of related ones. `s`
-shows every change (a list's added, removed, edited and moved entries one by one), and
+shows every change (a list's added, removed, edited and moved entries one by one; a long
+review scrolls with `↑`/`↓` and `pgup`/`pgdn`), and
 removing or emptying a system variable asks a second time.
 
 | Key | In the variables |
