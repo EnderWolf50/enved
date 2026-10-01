@@ -289,16 +289,15 @@ func (m *Model) Focus(on bool) {
 // Busy says whether a dialog or the filter is taking the keys.
 func (m *Model) Busy() bool { return m.input != nil || m.filter.Focused() }
 
-// Lines of the body around the table: the filter above; a blank, the divider, two detail
-// lines and the help below.
-const chrome = 6
+// Lines of the body around the table: the filter above; a blank, the divider and two detail
+// lines below. The help takes as many more as it needs.
+const chrome = 5
 
 // Resize fits the editor to a body of w by h cells.
 func (m *Model) Resize(w, h int) {
 	m.w, m.h = w, h
 	m.table.SetColumns(m.columns())
 	m.table.SetWidth(w)
-	m.table.SetHeight(h - chrome)
 	m.filter.SetWidth(w - 2)
 	m.help.SetWidth(w)
 	m.redraw()
@@ -335,7 +334,7 @@ func (m *Model) redraw() {
 	for row, i := range m.shown {
 		e := m.entries[i]
 		onCursor := row == cursor && m.focused
-		r := theme.NewRow(e.change(), !e.removed && (problem[i] != "" || dupOf[i] > 0), onCursor)
+		r := theme.NewRow(e.change(), pick(!e.removed && (problem[i] != "" || dupOf[i] > 0), theme.Problem, theme.NoNote), onCursor)
 		plain := lipgloss.NewStyle()
 		value, state := r.Paint(plain, e.value), r.Paint(theme.OK, "ok")
 		switch {
@@ -592,6 +591,7 @@ func (m *Model) Body() string {
 		detail[i] = ansi.Truncate(detail[i], width, "…")
 	}
 
+	help := m.footer()
 	body := m.table.View()
 	if len(m.shown) == 0 {
 		note := "this list is empty · a adds an entry"
@@ -601,28 +601,39 @@ func (m *Model) Body() string {
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
 
-	keys := append([]key.Binding{keyUp, keyDown, keyEdit, keyAppend, keyRemove, keyMoveUp, keySave, keyBack}, m.ExtraKeys...)
-	keys = append(keys, keyClean, keyUndo, keyRedo, keyFilter)
-	if m.kind.onDisk() {
-		keys = append(keys, keyOpen)
-	}
-	keys = append(keys, keyReload)
-	if m.ReadOnly {
-		keys = []key.Binding{keyUp, keyDown, keyFilter, keyBack}
-	}
-	if m.filter.Focused() {
-		keys = []key.Binding{
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
-		}
-	}
 	return strings.Join([]string{
 		filter,
 		body, "",
-		theme.Divider(width, theme.Legend(!m.ReadOnly, m.kind.noted())),
+		theme.Divider(width, theme.Legend(!m.ReadOnly, "", m.kind.noted())),
 		strings.Join(detail, "\n"),
-		ansi.Truncate(m.help.ShortHelpView(keys), width, "…"),
+		help,
 	}, "\n")
+}
+
+// footer is the help under the table: groups of related keys, over as many lines as they
+// need, which the table gives up. While the filter is typed its own keys take those lines.
+func (m *Model) footer() string {
+	edit := []key.Binding{keyEdit, keyAppend, keyRemove, keyMoveUp, keyClean}
+	if m.kind.onDisk() {
+		edit = append(edit, keyOpen)
+	}
+	groups := [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}, edit, m.ExtraKeys, {keyUndo, keyRedo, keySave, keyReload}}
+	if m.ReadOnly {
+		groups = [][]key.Binding{{keyUp, keyDown, keyFilter, keyBack}}
+	}
+	lines := theme.HelpLines(m.help, m.w, groups...)
+	m.table.SetHeight(max(m.h-chrome-len(lines), 1))
+	if m.filter.Focused() {
+		n := len(lines)
+		lines = theme.HelpLines(m.help, m.w, []key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
+		})
+		for len(lines) < n {
+			lines = append(lines, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Review lists every change, for the review before saving.

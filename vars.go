@@ -362,7 +362,7 @@ func (t *varTab) redraw() {
 	cols := t.table.Columns()
 	t.paint(func(i int, cursor bool) table.Row {
 		v := t.vars[i]
-		r := theme.NewRow(v.change(), isSystem(v.name), cursor)
+		r := theme.NewRow(v.change(), pick(isSystem(v.name), theme.Info, theme.NoNote), cursor)
 		plain := lipgloss.NewStyle()
 		name, value := r.Paint(plain, v.name), r.Paint(plain, t.shownValue(v))
 		if v.removed {
@@ -676,6 +676,12 @@ func (t *varTab) Body() string {
 		detail[i] = ansi.Truncate(detail[i], width, "…")
 	}
 
+	help := t.footer(
+		[]key.Binding{keyUp, keyDown, keyFilter, keyBack},
+		[]key.Binding{keyEdit, keyText, keyAdd, keyRename, keyRemove},
+		[]key.Binding{keyType, keyList},
+		[]key.Binding{keyCopyName, keyCopy},
+		[]key.Binding{keyUndo, keyRedo, keySave, keyReload})
 	body := t.table.View()
 	if len(t.shown) == 0 {
 		note := "no variables · a adds one"
@@ -684,19 +690,12 @@ func (t *varTab) Body() string {
 		}
 		body = lipgloss.Place(width, lipgloss.Height(body), lipgloss.Center, lipgloss.Center, theme.Dim.Render(note))
 	}
-	keys := []key.Binding{keyUp, keyDown, keyEdit, keyText, keyAdd, keyRemove, keyRename, keyType, keyList, keyUndo, keyRedo, keySave, keyBack, keyCopy, keyCopyName, keyFilter, keyReload}
-	if t.filter.Focused() {
-		keys = []key.Binding{
-			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
-			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
-		}
-	}
 	return strings.Join([]string{
 		t.filterLine(),
 		body, "",
-		theme.Divider(width, theme.Legend(true, "Windows relies on it")),
+		theme.Divider(width, theme.Legend(true, "Windows relies on it", "")),
 		strings.Join(detail, "\n"),
-		ansi.Truncate(t.help.ShortHelpView(keys), width, "…"),
+		help,
 	}, "\n")
 }
 

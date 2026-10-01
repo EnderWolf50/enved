@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	"charm.land/lipgloss/v2"
@@ -29,10 +30,19 @@ func (c Change) Sign() string {
 // every piece of the row is painted with it: each colored run and each cell's padding.
 type Row struct{ bg lipgloss.Style }
 
-// NewRow is a row with the background for its change, under the cursor or not. An
-// unchanged row with a note (something to look at: a missing folder, a system variable)
-// gets a light tint of its own.
-func NewRow(c Change, note, cursor bool) Row {
+// Note is what an unchanged row has to say, which tints it lightly: a fact to keep in mind
+// (a system variable, a stale value), or a problem (a missing folder, a duplicate).
+type Note int
+
+const (
+	NoNote Note = iota
+	Info
+	Problem
+)
+
+// NewRow is a row with the background for its change, under the cursor or not; an
+// unchanged row with a note gets the note's light tint.
+func NewRow(c Change, note Note, cursor bool) Row {
 	var bg lipgloss.Style
 	switch {
 	case c == Removed:
@@ -41,8 +51,10 @@ func NewRow(c Change, note, cursor bool) Row {
 		bg = bg.Background(pick(cursor, bgAddedCursor, bgAdded))
 	case c == Edited:
 		bg = bg.Background(pick(cursor, bgEditedCursor, bgEdited))
-	case note:
+	case note == Info:
 		bg = bg.Background(pick(cursor, bgNoteCursor, bgNote))
+	case note == Problem:
+		bg = bg.Background(pick(cursor, bgProblemCursor, bgProblem))
 	case cursor:
 		bg = bg.Background(bgCursor)
 	}
@@ -76,8 +88,9 @@ func (r Row) Cells(cols []table.Column, cells ...string) table.Row {
 }
 
 // Legend is the key to the row tints, for Divider: a swatch of each one and its meaning.
-// changes adds added, edited and removed; note names what the light tint marks, if any.
-func Legend(changes bool, note string) string {
+// changes adds added, edited and removed; info and problem name what those light tints
+// mark, if anything.
+func Legend(changes bool, info, problem string) string {
 	swatch := func(bg color.Color, what string) string {
 		return lipgloss.NewStyle().Background(bg).Render("  ") + Dim.Render(" "+what)
 	}
@@ -85,8 +98,11 @@ func Legend(changes bool, note string) string {
 	if changes {
 		items = append(items, swatch(bgAdded, "added"), swatch(bgEdited, "edited"), swatch(bgRemoved, "removed"))
 	}
-	if note != "" {
-		items = append(items, swatch(bgNote, note))
+	if info != "" {
+		items = append(items, swatch(bgNote, info))
+	}
+	if problem != "" {
+		items = append(items, swatch(bgProblem, problem))
 	}
 	return strings.Join(items, "  ")
 }
@@ -141,4 +157,44 @@ func NewTable() table.Model {
 	styles.Cell = lipgloss.NewStyle()     // Row.Cells pads and paints every cell itself
 	styles.Selected = lipgloss.NewStyle() // the cursor row is painted by NewRow too
 	return table.New(table.WithKeyMap(km), table.WithStyles(styles), table.WithFocused(true))
+}
+
+// HelpLines lays groups of keys out over lines of width: a group's keys stay together, a
+// group that does not fit starts a new line, and groups on one line are set apart by a dim │.
+// A group wider than a line is split.
+func HelpLines(h help.Model, width int, groups ...[]key.Binding) []string {
+	h.SetWidth(0)
+	sep := Faint.Render("  │  ")
+	var lines []string
+	line := ""
+	// A group wider than a line goes in as several, each as wide as fits.
+	var fitted [][]key.Binding
+	for _, g := range groups {
+		for len(g) > 0 {
+			n := 1
+			for n < len(g) && lipgloss.Width(h.ShortHelpView(g[:n+1])) <= width {
+				n++
+			}
+			fitted, g = append(fitted, g[:n]), g[n:]
+		}
+	}
+	for _, g := range fitted {
+		view := h.ShortHelpView(g)
+		switch {
+		case line == "":
+			line = view
+		case lipgloss.Width(line)+lipgloss.Width(sep)+lipgloss.Width(view) <= width:
+			line += sep + view
+		default:
+			lines = append(lines, line)
+			line = view
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], max(width, 0), "…")
+	}
+	return lines
 }

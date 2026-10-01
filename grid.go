@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -28,15 +29,14 @@ func newGrid() grid {
 	return g
 }
 
-// Lines of the body around the table: the filter above; a blank, the divider, two detail
-// lines and the help below.
-const gridChrome = 6
+// Lines of the body around the table: the filter above; a blank, the divider and two detail
+// lines below. The help takes as many more as footer needs.
+const gridChrome = 5
 
 func (g *grid) resize(w, h int, cols func() []table.Column) {
 	g.w, g.h = w, h
 	g.table.SetColumns(cols())
 	g.table.SetWidth(w)
-	g.table.SetHeight(h - gridChrome)
 	g.filter.SetWidth(w - 2)
 	g.help.SetWidth(w)
 }
@@ -99,6 +99,24 @@ func (g *grid) updateFilter(msg tea.KeyPressMsg) (cmd tea.Cmd, changed bool) {
 	g.filter, cmd = g.filter.Update(msg)
 	g.table.SetCursor(0)
 	return cmd, true
+}
+
+// footer is the help under the table: groups of related keys, over as many lines as they
+// need, which the table gives up. While the filter is typed its own keys take those lines.
+func (g *grid) footer(groups ...[]key.Binding) string {
+	lines := theme.HelpLines(g.help, g.w, groups...)
+	g.table.SetHeight(max(g.h-gridChrome-len(lines), 1))
+	if g.filter.Focused() {
+		n := len(lines)
+		lines = theme.HelpLines(g.help, g.w, []key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "keep filter")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear filter")),
+		})
+		for len(lines) < n {
+			lines = append(lines, "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (g *grid) filterLine() string {
